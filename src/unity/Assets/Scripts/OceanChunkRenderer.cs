@@ -10,9 +10,16 @@ namespace OceanResearch
     /// </summary>
     public class OceanChunkRenderer : MonoBehaviour
     {
-        public int _lodIndex = -1;
         public static bool _enableSmoothLOD = true;
+
+        [HideInInspector]
+        public int _lodIndex = -1;
+
+        [HideInInspector]
         public Camera[] _shapeCameras;
+
+        [HideInInspector]
+        public bool _biggestLod = false;
 
         [HideInInspector]
         public float _baseVertDensity = 32f;

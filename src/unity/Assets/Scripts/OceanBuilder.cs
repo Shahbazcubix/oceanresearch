@@ -436,6 +436,7 @@ namespace OceanResearch
                 ocr._lodIndex = lodIndex;
                 ocr._shapeCameras = (Camera[])_shapeCameras.Clone();
                 ocr._baseVertDensity = parms._baseVertDensity;
+                ocr._biggestLod = lodIndex == parms._lodCount - 1;
 
                 inst.GetComponent<MeshFilter>().mesh = meshData[(int)patchTypes[i]];
 
