@@ -107,7 +107,9 @@ Shader "Ocean/Ocean"
 					float2 offCont = (i_samplePos - i_centerPosCont) / (i_texelSize*i_res);
 					float offContL1 = max( abs( offCont.x ), abs( offCont.y ) );
 
-					o_wt = smoothstep( 0.5 - 1./i_res, .5-4./i_res, offContL1 );
+					// start fading 32 texels before the edge, wt goes to 0 within 4 texels of edge. a texel is the same
+					// as a vert, and the verts are lodded out at the edges so 1 geometry square is 2 texels wide.
+					o_wt = smoothstep( 0.5 - 4./i_res, .5-32./i_res, offContL1 );
 
 					if( o_wt <= 0.001 )
 					{
