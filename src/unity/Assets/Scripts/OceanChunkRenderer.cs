@@ -63,6 +63,8 @@ namespace OceanResearch
 
             float squareSize = Mathf.Abs( transform.lossyScale.x ) / _baseVertDensity;
             _thisRend.material.SetVector( "_GeomData", new Vector4( squareSize, squareSize * 2f, squareSize * 4f, _baseVertDensity ) );
+            // blend furthest normals scale in/out to avoid pop
+            _thisRend.material.SetFloat( "_FarNormalsWeight", _biggestLod ? OceanRenderer.CAMY_MESH_SCALE_LERP : 1f );
 
             // this relies on the render textures being init'd in CreateAssignRenderTexture::Awake().
             // the only reason I'm doing this here is because the assignments are lost if you edit the shader while running.

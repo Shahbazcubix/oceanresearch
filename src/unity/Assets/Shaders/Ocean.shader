@@ -16,10 +16,8 @@ Shader "Ocean/Ocean"
 		// We must be transparent, so other objects are drawn before this one.
 		Tags { "Queue"="Transparent" "RenderType"="Opaque" }
 
-
 		SubShader
 		{
-
 			// This pass grabs the screen behind the object into a texture.
 			// We can access the result in the next pass as _GrabTexture
 			GrabPass
@@ -55,7 +53,7 @@ Shader "Ocean/Ocean"
 					float4 vertex : SV_POSITION;
 					float4 uvgrab : TEXCOORD0;
 					float3 n : TEXCOORD1;
-					float4 facing : TEXCOORD5;
+					float3 facing : TEXCOORD5;
 					float3 view : TEXCOORD6;
 					float2 worldXZ : TEXCOORD7;
 					
@@ -98,9 +96,12 @@ Shader "Ocean/Ocean"
 				uniform float4 _Diffuse;
 
 				// Geometry data
-				// xyz: A square is formed by 2 triangles in the mesh. Here xyz is (square size, 2 X square size, 4 X square size)
+				// xyz: A square is formed by 2 triangles in the mesh. Here xyz is (square size, 2 X square size, next square size)
 				// w: Geometry density - side length of patch measured in squares
 				uniform float4 _GeomData = float4(1.0, 2.0, 4.0, 32.0);
+
+				// Allow furthest normals to be blended in/out to avoid pops when ocean changes scale
+				uniform float _FarNormalsWeight = 1.0;
 
 				#define COLOR_COUNT 5.
 
@@ -206,11 +207,7 @@ Shader "Ocean/Ocean"
 
 					float3 debugtint = (float3)0.;
 					float3 tintCols[5];
-					tintCols[0] = float3(1., 0., 0.);
-					tintCols[1] = float3(1., 1., 0.);
-					tintCols[2] = float3(0., 1., 0.);
-					tintCols[3] = float3(0., 1., 1.);
-					tintCols[4] = float3(0., 0., 1.);
+					tintCols[0] = float3(1., 0., 0.); tintCols[1] = float3(1., 1., 0.); tintCols[2] = float3(0., 1., 0.); tintCols[3] = float3(0., 1., 1.); tintCols[4] = float3(0., 0., 1.);
 
 					float wt = 1.;
 					SAMPLE_SHAPE( 0 );
@@ -228,8 +225,7 @@ Shader "Ocean/Ocean"
 					o.worldXZ = pos_world.xz;
 
 					// used to scale normals in the fragment shader
-					o.facing.z = SQUARE_SIZE;
-					o.facing.w = frac_high;
+					o.facing.z = frac_high;
 	
 					// refract starts here
 	
@@ -285,34 +281,31 @@ Shader "Ocean/Ocean"
 
 				half4 frag (v2f i) : SV_Target
 				{
-					float l = i.facing.x;
-					float3 lightDir = normalize(float3(1.,.1,1.));
-	
 					// normal - geom + normal mapping
 					float3 n = i.n;
 					float th0 = .35, th1 = 3.7;
 					float2 v0 = float2(cos( th0 ), sin( th0 )), v1 = float2(cos( th1 ), sin( th1 ));
-					float nscale = .25;
 					const bool USE_LOG_SCALE = false;
-					float geomSquareSize = i.facing.z;
+					float geomSquareSize = _GeomData.x;
 					float nstretch = 80.*geomSquareSize; // normals scaled with geometry
-					float spdmulL = log( 1. + 2.*i.facing.z ) * 1.875;
+					float spdmulL = log( 1. + 2.*geomSquareSize ) * 1.875;
 					float2 norm = 
-						nscale * (tex2D( _Normals, (v0 * _Time.y*spdmulL + i.worldXZ) / nstretch ).wz - .5) +
-						nscale * (tex2D( _Normals, (v1 * _Time.y*spdmulL + i.worldXZ) / nstretch ).wz - .5);
+						(tex2D( _Normals, (v0 * _Time.y*spdmulL + i.worldXZ) / nstretch ).wz - .5) +
+						(tex2D( _Normals, (v1 * _Time.y*spdmulL + i.worldXZ) / nstretch ).wz - .5);
+
 					// blend in next higher scale of normals to obtain continuity
-					float nblend = i.facing.w;
+					float nblend = i.facing.z * _FarNormalsWeight;
 					if( nblend > 0.001 )
 					{
 						nstretch *= 2.;
-						float spdmulH = log( 1. + 4.*i.facing.z ) * 1.875;
+						float spdmulH = log( 1. + 4.*geomSquareSize ) * 1.875;
 						norm = lerp( norm,
-							nscale * (tex2D( _Normals, (v0 * _Time.y*spdmulH + i.worldXZ) / nstretch ).wz - .5) +
-							nscale * (tex2D( _Normals, (v1 * _Time.y*spdmulH + i.worldXZ) / nstretch ).wz - .5),
+							(tex2D( _Normals, (v0 * _Time.y*spdmulH + i.worldXZ) / nstretch ).wz - .5) +
+							(tex2D( _Normals, (v1 * _Time.y*spdmulH + i.worldXZ) / nstretch ).wz - .5),
 							nblend );
 					}
 
-					n.xz -= norm;
+					n.xz -= 0.25 * norm;
 					n.y = 1.;
 					n = normalize( n );
 
@@ -360,6 +353,11 @@ Shader "Ocean/Ocean"
 					#if defined( DEBUG_SHAPE_SAMPLE )
 					col.rgb *= 2.*i.debugtint;
 					#endif
+
+					// check normals
+					//col.rb = norm;
+					//col.g = i.facing.z;
+					//col.rb *= 50.;
 
 					return col;
 				}
