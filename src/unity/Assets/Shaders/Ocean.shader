@@ -265,9 +265,11 @@ Shader "Ocean/Ocean"
 					float geomSquareSize = i.facing.z;
 					float nstretch = 80.*geomSquareSize; // normals scaled with geometry
 					float spdmulL = log( 1. + 2.*i.facing.z ) * 1.875;
+					// we can bias the mips when using TAA, -1 seems to work fine, -2 starts to get noticeable
+					float bias = 0.;
 					float2 norm = 
-						nscale * (tex2D( _Normals, (v0 * _Time.y*spdmulL + i.worldXZ) / nstretch ).wz - .5) +
-						nscale * (tex2D( _Normals, (v1 * _Time.y*spdmulL + i.worldXZ) / nstretch ).wz - .5);
+						nscale * (tex2Dbias( _Normals, float4((v0 * _Time.y*spdmulL + i.worldXZ) / nstretch, 0., bias) ).wz - .5 ) +
+						nscale * (tex2Dbias( _Normals, float4((v1 * _Time.y*spdmulL + i.worldXZ) / nstretch, 0., bias) ).wz - .5 );
 					// blend in next higher scale of normals to obtain continuity
 					float nblend = i.facing.w;
 					if( nblend > 0.001 )
