@@ -6,6 +6,8 @@ Shader "Ocean/Ocean"
 	{
 		_RefractAmt  ("Refract Strengh", range (0,1)) = 0
 		_Normals ( "Normals", 2D ) = "bump" {}
+		_Skybox ("Skybox", CUBE) = "" {}
+		_Diffuse ("Diffuse", Color) = (0.2, 0.05, 0.05, 1.0)
 	}
 
 	Category
@@ -81,6 +83,8 @@ Shader "Ocean/Ocean"
 
 				uniform float _EnableSmoothLODs = 1.0;
 				uniform float _LODIndex = 0.;
+
+				uniform float4 _Diffuse;
 
 				// Geometry data
 				// xyz: A square is formed by 2 triangles in the mesh. Here xyz is (square size, 2 X square size, 4 X square size)
@@ -223,6 +227,7 @@ Shader "Ocean/Ocean"
 				sampler2D _GrabTexture;
 				float4 _GrabTexture_TexelSize;
 				sampler2D _MainTex;
+				samplerCUBE _Skybox;
 
 				#define SUN_DIR float3(-0.70710678,0.,-.70710678)
 
@@ -288,6 +293,8 @@ Shader "Ocean/Ocean"
 					half4 col = (half4)0.;
 	
 					// calculate perturbed coordinates
+					// dz - commented, but I'll leave it in for now in case we want to go transparent
+					/*
 					float2 offset = -l * mul(UNITY_MATRIX_V,float4(n,0.)).xy/i.facing.y; // divide by viewz to ramp down
 					float4 refractUV = i.uvgrab;
 					refractUV.xy = _RefractAmt * offset * i.uvgrab.z + i.uvgrab.xy;
@@ -296,9 +303,14 @@ Shader "Ocean/Ocean"
 	
 					// blue tint
 					col.xyz *= float3(0.8, 0.5, 1.3) * 0.2;
+					*/
+
+					// Diffuse color
+					col = _Diffuse;
 
 					// fresnel / reflection
-					float3 skyColor = bgSkyColor( reflect( -i.view, n ) );
+				//	float3 skyColor = bgSkyColor( reflect( -i.view, n ) );
+					float3 skyColor = texCUBE(_Skybox, normalize( reflect(-i.view, n) ));
 					col.xyz = lerp( col.xyz, skyColor, pow( 1. - max( 0., dot( i.view, n ) ), 8. ) );
 
 					//float4 uv = i.uvgrab/i.uvgrab.w;
