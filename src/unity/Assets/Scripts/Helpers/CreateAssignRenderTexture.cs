@@ -19,7 +19,7 @@ public class CreateAssignRenderTexture : MonoBehaviour
     public int _anisoLevel = 0;
     public bool _useMipMap = false;
 
-	void Awake()
+	void Start()
     {
         RenderTexture tex = new RenderTexture( _width, _height, _depthBits, _format );
         tex.wrapMode = _wrapMode;

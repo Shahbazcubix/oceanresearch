@@ -53,14 +53,14 @@ Shader "Ocean/Ocean"
 					float4 facing : TEXCOORD5;
 					float3 view : TEXCOORD6;
 					float2 worldXZ : TEXCOORD7;
-					UNITY_FOG_COORDS(3)
+					UNITY_FOG_COORDS( 3 )
 				};
 
 				// shape data
+				// Params: float3(texel size, texture resolution, shape weight multiplier)
 				#define SHAPE_LOD_PARAMS(LODNUM) \
 					uniform sampler2D _WD_Sampler_##LODNUM; \
-					uniform float _WD_TexelSize_##LODNUM; \
-					uniform float _WD_Res_##LODNUM; \
+					uniform float3 _WD_Params_##LODNUM; \
 					uniform float2 _WD_Pos_##LODNUM; \
 					uniform float2 _WD_Pos_Cont_##LODNUM;
 
@@ -68,6 +68,7 @@ Shader "Ocean/Ocean"
 				SHAPE_LOD_PARAMS( 1 )
 				SHAPE_LOD_PARAMS( 2 )
 				SHAPE_LOD_PARAMS( 3 )
+				SHAPE_LOD_PARAMS( 4 )
 
 
 				uniform float _RefractAmt;
@@ -130,7 +131,8 @@ Shader "Ocean/Ocean"
 					if( wt > 0. ) \
 					{ \
 						float3 disp_##LODNUM, n_##LODNUM; float wt_##LODNUM; \
-						SampleDisplacements( _WD_Sampler_##LODNUM, _WD_Pos_##LODNUM, _WD_Pos_Cont_##LODNUM, _WD_Res_##LODNUM, _WD_TexelSize_##LODNUM, idealSquareSize, pos_world.xz, disp_##LODNUM, n_##LODNUM, wt_##LODNUM ); \
+						SampleDisplacements( _WD_Sampler_##LODNUM, _WD_Pos_##LODNUM, _WD_Pos_Cont_##LODNUM, _WD_Params_##LODNUM.y, _WD_Params_##LODNUM.x, idealSquareSize, pos_world.xz, disp_##LODNUM, n_##LODNUM, wt_##LODNUM ); \
+						wt_##LODNUM *= _WD_Params_##LODNUM.z; \
 						pos_world += wt * wt_##LODNUM * disp_##LODNUM; \
 						o.n.xz += wt * wt_##LODNUM * n_##LODNUM.xz; \
 						wt *= (1. - wt_##LODNUM); \
@@ -194,6 +196,7 @@ Shader "Ocean/Ocean"
 					SAMPLE_SHAPE( 1 );
 					SAMPLE_SHAPE( 2 );
 					SAMPLE_SHAPE( 3 );
+					SAMPLE_SHAPE( 4 );
 
 
 					// view-projection	

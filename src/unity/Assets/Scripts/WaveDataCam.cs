@@ -11,19 +11,13 @@ namespace OceanResearch
     [RequireComponent( typeof( Camera ) )]
     public class WaveDataCam : MonoBehaviour
     {
-        public ShapeGerstner _gerstner;
-
         public int _wdRes = 0;
+        public bool _biggestLod = false;
 
-        public bool _autoConfigCircleOffset = true;
-
-        string _waveDataResParamName;
-        string _waveDataTexSizeParamName;
         string _waveDataPosParamName;
+        string _waveDataParamsName;
         string _waveDataPosContParamName;
 
-        //bool _moveWithShape = false;
-        //Vector2 _smoothPos = Vector2.zero;
         int _shapeRes = 512;
 
         void Start()
@@ -36,34 +30,21 @@ namespace OceanResearch
                 _shapeRes = camera.targetTexture.width;
             }
 
-            _waveDataResParamName = "_WD_Res_" + _wdRes.ToString();
-            _waveDataTexSizeParamName = "_WD_TexelSize_" + _wdRes.ToString();
             _waveDataPosParamName = "_WD_Pos_" + _wdRes.ToString();
+            _waveDataParamsName = "_WD_Params_" + _wdRes.ToString();
             _waveDataPosContParamName = "_WD_Pos_Cont_" + _wdRes.ToString();
 
-            if( _autoConfigCircleOffset )
-            {
-                SphereOffset co = GetComponent<SphereOffset>();
-                if( co )
-                {
-                    co._radius = camera.orthographicSize * 0.8f;
-                }
-            }
-
-            // gather list of hte ocean chunk rends
+            // gather list of the ocean chunk renderers
             FindOceanRenderers();
         }
 
         // script execution order ensures this runs after CircleOffset
         void LateUpdate()
         {
-            //if( _moveWithShape )
-            //{
-            //    Vector2 vel = _gerstner.m_speed * new Vector2( Mathf.Cos( Mathf.Deg2Rad * _gerstner.m_angle ), Mathf.Sin( Mathf.Deg2Rad * _gerstner.m_angle ) );
-
-            //    _smoothPos.x += vel.x * Time.deltaTime;
-            //    _smoothPos.y += vel.y * Time.deltaTime;
-            //}
+            // ensure camera size matches geometry size
+            camera.orthographicSize = 2f * Mathf.Abs( transform.lossyScale.x );
+            bool flip = transform.lossyScale.z < 0f;
+            transform.localEulerAngles = new Vector3( flip ? -90f : 90f, 0f, 0f );
 
             // find snap period
             int width = camera.targetTexture.width;
@@ -75,18 +56,11 @@ namespace OceanResearch
             }
             float textureRes = (float)camera.targetTexture.width;
             float texelWidth = 2f * camera.orthographicSize / textureRes;
-
-            Vector3 continuousPos = transform.position;
-
             // snap so that shape texels are stationary
-            transform.position = continuousPos
-                - new Vector3( Mathf.Repeat( continuousPos.x, texelWidth ), 0f, Mathf.Repeat( continuousPos.z, texelWidth ) );
+            Vector3 continuousPos = transform.position;
+            //transform.position = continuousPos
+            //    - new Vector3( Mathf.Repeat( continuousPos.x, texelWidth ), 0f, Mathf.Repeat( continuousPos.z, texelWidth ) );
 
-            // moving shape disabled for now, needs to be reconciled with position snap above
-            //Vector3 pos = transform.localPosition;
-            //pos.x = Mathf.Repeat( m_smoothPos.x, texelWidth );
-            //pos.z = Mathf.Repeat( m_smoothPos.y, texelWidth );
-            //transform.localPosition = pos;
 
             if( _renderers == null || _renderers.Count == 0 || _renderers[0] == null )
             {
@@ -102,8 +76,8 @@ namespace OceanResearch
             {
                 if( !r || !r.material ) continue;
 
-                r.material.SetFloat( _waveDataResParamName, textureRes );
-                r.material.SetFloat( _waveDataTexSizeParamName, texelWidth );
+                float shapeWeight = _biggestLod ? OceanRenderer.CAMY_MESH_SCALE_LERP : 1f;
+                r.material.SetVector( _waveDataParamsName, new Vector3( texelWidth, textureRes, shapeWeight ) );
                 r.material.SetVector( _waveDataPosParamName, new Vector2( transform.position.x, transform.position.z ) );
                 r.material.SetVector( _waveDataPosContParamName, new Vector2( continuousPos.x, continuousPos.z ) );
             }
