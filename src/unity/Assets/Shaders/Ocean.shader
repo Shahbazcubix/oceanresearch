@@ -41,18 +41,28 @@ Shader "Ocean/Ocean"
 				#pragma multi_compile_fog
 				#include "UnityCG.cginc"
 
-				struct appdata_t {
+				// tints the output color based on which shape texture(s) were sampled, blended according to weight
+				//#define DEBUG_SHAPE_SAMPLE
+
+				struct appdata_t
+				{
 					float4 vertex : POSITION;
 					float2 texcoord: TEXCOORD0;
 				};
 
-				struct v2f {
+				struct v2f
+				{
 					float4 vertex : SV_POSITION;
 					float4 uvgrab : TEXCOORD0;
 					float3 n : TEXCOORD1;
 					float4 facing : TEXCOORD5;
 					float3 view : TEXCOORD6;
 					float2 worldXZ : TEXCOORD7;
+					
+					#if defined( DEBUG_SHAPE_SAMPLE )
+					float3 debugtint : TEXCOORD8;
+					#endif
+
 					UNITY_FOG_COORDS( 3 )
 				};
 
@@ -138,6 +148,7 @@ Shader "Ocean/Ocean"
 						pos_world += wt * wt_##LODNUM * disp_##LODNUM; \
 						o.n.xz += wt * wt_##LODNUM * n_##LODNUM.xz; \
 						wt *= (1. - wt_##LODNUM); \
+						debugtint = lerp( debugtint, tintCols[##LODNUM], wt ); \
 					}
 
 
@@ -193,6 +204,14 @@ Shader "Ocean/Ocean"
 	
 					o.n = float3(0., 1., 0.);
 
+					float3 debugtint = (float3)0.;
+					float3 tintCols[5];
+					tintCols[0] = float3(1., 0., 0.);
+					tintCols[1] = float3(1., 1., 0.);
+					tintCols[2] = float3(0., 1., 0.);
+					tintCols[3] = float3(0., 1., 1.);
+					tintCols[4] = float3(0., 0., 1.);
+
 					float wt = 1.;
 					SAMPLE_SHAPE( 0 );
 					SAMPLE_SHAPE( 1 );
@@ -200,6 +219,9 @@ Shader "Ocean/Ocean"
 					SAMPLE_SHAPE( 3 );
 					SAMPLE_SHAPE( 4 );
 
+					#if defined( DEBUG_SHAPE_SAMPLE )
+					o.debugtint = debugtint;
+					#endif
 
 					// view-projection	
 					o.vertex = mul( UNITY_MATRIX_VP, float4(pos_world,1.) );
@@ -334,6 +356,10 @@ Shader "Ocean/Ocean"
 					//	col.rgb = float3(0.2, 1., 0.2);
 					//else //if( _LODIndex == 3. )
 					//	col.rgb = float3(0., 0.5, 1.);
+
+					#if defined( DEBUG_SHAPE_SAMPLE )
+					col.rgb *= 2.*i.debugtint;
+					#endif
 
 					return col;
 				}
