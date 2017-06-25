@@ -241,8 +241,8 @@ Shader "Ocean/Ocean"
 					UNITY_TRANSFER_FOG(o,o.vertex);
 	
 					float3 V = _WorldSpaceCameraPos - pos_world.xyz;
-					o.facing.y = length(V);
-					o.view = V/o.facing.y;
+					o.facing.y = 0.;
+					o.view = V;
 					o.facing.x = max( dot( o.view, o.n ), 0. );
 					return o;
 				}
@@ -297,6 +297,7 @@ Shader "Ocean/Ocean"
 					float nblend = i.facing.z * _FarNormalsWeight;
 					if( nblend > 0.001 )
 					{
+						// next lod level
 						nstretch *= 2.;
 						float spdmulH = log( 1. + 4.*geomSquareSize ) * 1.875;
 						norm = lerp( norm,
@@ -329,9 +330,10 @@ Shader "Ocean/Ocean"
 					col = _Diffuse;
 
 					// fresnel / reflection
-				//	float3 skyColor = bgSkyColor( reflect( -i.view, n ) );
-					float3 skyColor = texCUBE(_Skybox, normalize( reflect(-i.view, n) ));
-					col.xyz = lerp( col.xyz, skyColor, pow( 1. - max( 0., dot( i.view, n ) ), 8. ) );
+					float3 view = normalize( i.view );
+				//	float3 skyColor = bgSkyColor( reflect( -view, n ) );
+					float3 skyColor = texCUBE(_Skybox, normalize( reflect(-view, n) ));
+					col.xyz = lerp( col.xyz, skyColor, pow( 1. - max( 0., dot( view, n ) ), 8. ) );
 
 					//float4 uv = i.uvgrab/i.uvgrab.w;
 					//uv.y = 1. - uv.y;
