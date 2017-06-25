@@ -11,7 +11,8 @@ namespace OceanResearch
     public class OceanBuilder : MonoBehaviour
     {
 	    public Transform _chunkPrefab;
-        public Camera[] _shapeCameras;
+        Camera[] _shapeCameras;
+        public Transform _shapeCameraPrefab;
 
         public class Params
         {
@@ -136,6 +137,11 @@ namespace OceanResearch
 
         public void GenerateMesh( Params parms )
         {
+            if( parms._lodCount < 1 )
+            {
+                Debug.LogError( "Invalid LOD count: " + parms._lodCount.ToString(), this );
+                return;
+            }
 
     #if UNITY_EDITOR
             if( !UnityEditor.EditorApplication.isPlaying )
@@ -152,6 +158,20 @@ namespace OceanResearch
             Mesh[] meshInsts = new Mesh[(int)PatchType.Count];
             for( int i = 0; i < (int)PatchType.Count; i++ )
                 meshInsts[i] = BuildOceanPatch( (PatchType)i, parms );
+
+            // create the shape cameras
+            var scs = new Transform[parms._lodCount];
+            _shapeCameras = new Camera[parms._lodCount];
+            for( int i = 0; i < parms._lodCount; i++ )
+            {
+                scs[i] = Instantiate( _shapeCameraPrefab ) as Transform;
+                _shapeCameras[i] = scs[i].GetComponent<Camera>();
+                var wdc = _shapeCameras[i].GetComponent<WaveDataCam>();
+                wdc._wdRes = i;
+                wdc._biggestLod = i == (parms._lodCount - 1);
+                var cart = _shapeCameras[i].GetComponent<CreateAssignRenderTexture>();
+                cart._width = cart._height = (int)(4f * parms._baseVertDensity);
+            }
 
             int startLevel = 0;
             for( int i = 0; i < parms._lodCount; i++ )
@@ -329,6 +349,10 @@ namespace OceanResearch
             parent.transform.localPosition = Vector3.zero;
             parent.transform.localRotation = Quaternion.identity;
 
+            // add a shape camera below it
+            _shapeCameras[lodIndex].transform.parent = parent.transform;
+            _shapeCameras[lodIndex].transform.localScale = Vector3.one;
+            _shapeCameras[lodIndex].transform.localPosition = Vector3.zero;
 
             bool generateSkirt = parms._generateSkirt && biggestLOD;
 
