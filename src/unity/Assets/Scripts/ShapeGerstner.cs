@@ -38,7 +38,6 @@ namespace OceanResearch
         // Shader to be used to render out a single Gerstner octave.
         public Shader GerstnerOctaveShader;
 
-        bool _frozen = false;
         float _elapsedTime = 0f;
 
         Renderer[] _rends;
@@ -98,7 +97,7 @@ namespace OceanResearch
 
         void LateUpdate()
         {
-            if( !_frozen )
+            if( !OceanRenderer.Instance._freezeTime )
             {
                 _elapsedTime += Time.deltaTime;
             }
@@ -107,11 +106,6 @@ namespace OceanResearch
             {
                 rend.material.SetFloat("_MyTime", _elapsedTime);
             }
-        }
-
-        void OnGUI()
-        {
-            _frozen = GUI.Toggle( new Rect( 0, 75, 100, 25 ), _frozen, "Freeze waves" );
         }
     }
 }

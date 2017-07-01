@@ -10,8 +10,6 @@ namespace OceanResearch
     /// </summary>
     public class OceanChunkRenderer : MonoBehaviour
     {
-        public static bool _enableSmoothLOD = true;
-
         [HideInInspector]
         public int _lodIndex = -1;
 
@@ -59,7 +57,7 @@ namespace OceanResearch
 
             // global/per material data - would ideally be set just once..
             _thisRend.material.SetVector( "_OceanCenterPosWorld", _oceanRend.transform.position );
-            _thisRend.material.SetFloat( "_EnableSmoothLODs", _enableSmoothLOD ? 1f : 0f ); // debug
+            _thisRend.material.SetFloat( "_EnableSmoothLODs", OceanRenderer.Instance._enableSmoothLOD ? 1f : 0f ); // debug
 
             float squareSize = Mathf.Abs( transform.lossyScale.x ) / _baseVertDensity;
             _thisRend.material.SetVector( "_GeomData", new Vector4( squareSize, squareSize * 2f, squareSize * 4f, _baseVertDensity ) );
@@ -76,6 +74,7 @@ namespace OceanResearch
         {
             _visible = true;
         }
+
         void OnBecameInvisible()
         {
             _visible = false;

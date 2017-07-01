@@ -18,6 +18,12 @@ namespace OceanResearch
 
         public float _maxScale = -1f;
 
+        [Header( "Debug Params" )]
+        [Tooltip("Smoothly transition geometry LODs")]
+        public bool _enableSmoothLOD = true;
+        [Tooltip( "Freeze wave shape in place but continues to move geom with camera, useful for hunting down pops" )]
+        public bool _freezeTime = false;
+
         [Header( "Geometry Params" )]
         [SerializeField]
         [Tooltip( "Side dimension in quads of an ocean tile." )]
@@ -74,7 +80,8 @@ namespace OceanResearch
 
         void OnGUI()
         {
-            OceanChunkRenderer._enableSmoothLOD = GUI.Toggle( new Rect( 0, 0, 150, 25 ), OceanChunkRenderer._enableSmoothLOD, "Enable smooth LOD" );
+            _enableSmoothLOD = GUI.Toggle( new Rect( 0, 0, 150, 25 ), _enableSmoothLOD, "Enable smooth LOD" );
+            _freezeTime = GUI.Toggle( new Rect( 0, 75, 100, 25 ), _freezeTime, "Freeze waves" );
         }
 
         OceanBuilder.Params MakeBuildParams()
