@@ -33,17 +33,14 @@ namespace OceanResearch
             _thisRend = GetComponent<Renderer>();
         }
 
-        // script execution order ensures this executes after CircleOffset (which may be used to place the ocean in front of the camera)
-        void LateUpdate()
+        // Called when visible to a camera
+        void OnWillRenderObject()
         {
             if( _regenMesh )
             {
                 _regenMesh = false;
                 _oceanRend.RegenMesh();
             }
-
-            // the rest runs every frame for every ocean patch, sadly. i tired hooking up to the culling/visibility callbacks
-            // and earlying out here, but these come a frame delayed which causes single frame glitches
 
             // per instance data
             _thisRend.material.SetFloat( "_LODIndex", (float)_lodIndex );
