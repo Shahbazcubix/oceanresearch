@@ -4,7 +4,6 @@ using UnityEngine;
 
 namespace OceanResearch
 {
-
     /// <summary>
     /// Sets shader parameters for each geometry tile/chunk.
     /// </summary>
@@ -28,8 +27,6 @@ namespace OceanResearch
         OceanRenderer _oceanRend;
         Renderer _thisRend;
 
-        bool _visible = false;
-
         void Start()
         {
             _oceanRend = GetComponentInParent<OceanRenderer>();
@@ -45,10 +42,8 @@ namespace OceanResearch
                 _oceanRend.RegenMesh();
             }
 
-            // optimisation
-            if( !_visible )
-                return;
-
+            // the rest runs every frame for every ocean patch, sadly. i tired hooking up to the culling/visibility callbacks
+            // and earlying out here, but these come a frame delayed which causes single frame glitches
 
             // per instance data
             _thisRend.material.SetFloat( "_LODIndex", (float)_lodIndex );
@@ -68,16 +63,6 @@ namespace OceanResearch
             // the only reason I'm doing this here is because the assignments are lost if you edit the shader while running.
             for( int j = 0; j < _shapeCameras.Length; j++ )
                 _thisRend.material.SetTexture( "_WD_Sampler_" + j.ToString(), _shapeCameras[j].targetTexture );
-        }
-
-        void OnBecameVisible()
-        {
-            _visible = true;
-        }
-
-        void OnBecameInvisible()
-        {
-            _visible = false;
         }
     }
 }
