@@ -8,6 +8,9 @@ Shader "Ocean/Ocean"
 		_Normals ( "Normals", 2D ) = "bump" {}
 		_Skybox ("Skybox", CUBE) = "" {}
 		_Diffuse ("Diffuse", Color) = (0.2, 0.05, 0.05, 1.0)
+		_FoamTexture ( "Foam Texture", 2D ) = "white" {}
+		_FoamWhiteColor("White Foam Color", Color) = (1.0, 1.0, 1.0, 1.0)
+		_FoamBubbleColor ( "Bubble Foam Color", Color ) = (0.0, 0.0904, 0.105, 1.0)
 	}
 
 	Category
@@ -56,6 +59,8 @@ Shader "Ocean/Ocean"
 					float3 facing : TEXCOORD5;
 					float3 view : TEXCOORD6;
 					float2 worldXZ : TEXCOORD7;
+					float foamAmount : TEXCOORD8;
+					float2 worldXZUndisplaced : TEXCOORD9;
 					
 					#if defined( DEBUG_SHAPE_SAMPLE )
 					float3 debugtint : TEXCOORD8;
@@ -108,7 +113,7 @@ Shader "Ocean/Ocean"
 				// sample wave or terrain height, with smooth blend towards edges.
 				// would equally apply to heights instead of displacements.
 				// this could be optimized further.
-				void SampleDisplacements( in sampler2D i_dispSampler, in float2 i_centerPos, in float2 i_centerPosCont, in float i_res, in float i_texelSize, in float i_geomSquareSize, in float2 i_samplePos, out float3 o_disp, out float3 o_n, out float o_wt )
+				void SampleDisplacements( in sampler2D i_dispSampler, in float2 i_centerPos, in float2 i_centerPosCont, in float i_res, in float i_texelSize, in float i_geomSquareSize, in float2 i_samplePos, out float3 o_disp, out float3 o_n, out float o_wt, out float o_foamAmount )
 				{
 					// set the MIP based on the current square size, with the transition to the higher mip
 					// hb using hte mip chain does NOT work out well when moving the shape texture around, because mip hierarchy will pop. this is knocked out below
@@ -125,6 +130,7 @@ Shader "Ocean/Ocean"
 					if( o_wt <= 0.001 )
 					{
 						o_disp = o_n = 0.;
+						o_foamAmount = 0.;
 						return;
 					}
 
@@ -138,16 +144,26 @@ Shader "Ocean/Ocean"
 					float3 disp_z = dd.yyz + tex2Dlod( i_dispSampler, uv + dd.yxyy ).xyz;
 
 					o_n = normalize( cross( disp_z - o_disp, disp_x - o_disp ) );
+
+
+					// The determinant of the displacement Jacobian is a good measure for turbulence:
+					// > 1: Stretch
+					// < 1: Squash
+					// < 0: Overlap
+					float4 du = float4(disp_x.xz, disp_z.xz) - o_disp.xzxz;
+					float det = (du.x * du.w - du.y * du.z) / (dd.z * dd.z);
+					o_foamAmount = 1. - smoothstep(0.0, 2.0, det);
 				}
 
 				#define SAMPLE_SHAPE(LODNUM) \
 					if( wt > 0. ) \
 					{ \
-						float3 disp_##LODNUM, n_##LODNUM; float wt_##LODNUM; \
-						SampleDisplacements( _WD_Sampler_##LODNUM, _WD_Pos_##LODNUM, _WD_Pos_Cont_##LODNUM, _WD_Params_##LODNUM.y, _WD_Params_##LODNUM.x, idealSquareSize, pos_world.xz, disp_##LODNUM, n_##LODNUM, wt_##LODNUM ); \
+						float3 disp_##LODNUM, n_##LODNUM; float wt_##LODNUM, foamAmount_##LODNUM; \
+						SampleDisplacements( _WD_Sampler_##LODNUM, _WD_Pos_##LODNUM, _WD_Pos_Cont_##LODNUM, _WD_Params_##LODNUM.y, _WD_Params_##LODNUM.x, idealSquareSize, pos_world.xz, disp_##LODNUM, n_##LODNUM, wt_##LODNUM, foamAmount_##LODNUM ); \
 						wt_##LODNUM *= _WD_Params_##LODNUM.z; \
 						pos_world += wt * wt_##LODNUM * disp_##LODNUM; \
 						o.n.xz += wt * wt_##LODNUM * n_##LODNUM.xz; \
+						o.foamAmount += wt * wt_##LODNUM * foamAmount_##LODNUM; \
 						wt *= (1. - wt_##LODNUM); \
 						debugtint = lerp( debugtint, tintCols[##LODNUM], wt ); \
 					}
@@ -204,6 +220,8 @@ Shader "Ocean/Ocean"
 					// and in WaveDataCam::Start()
 	
 					o.n = float3(0., 1., 0.);
+					o.foamAmount = 0.;
+					o.worldXZUndisplaced = pos_world.xz;
 
 					float3 debugtint = (float3)0.;
 					float3 tintCols[5];
@@ -251,6 +269,9 @@ Shader "Ocean/Ocean"
 				float4 _GrabTexture_TexelSize;
 				sampler2D _MainTex;
 				samplerCUBE _Skybox;
+				sampler2D _FoamTexture;
+				float4 _FoamWhiteColor;
+				float4 _FoamBubbleColor;
 
 				#define SUN_DIR float3(-0.70710678,0.,-.70710678)
 
@@ -334,6 +355,21 @@ Shader "Ocean/Ocean"
 				//	float3 skyColor = bgSkyColor( reflect( -view, n ) );
 					float3 skyColor = texCUBE(_Skybox, normalize( reflect(-view, n) ));
 					col.xyz = lerp( col.xyz, skyColor, pow( 1. - max( 0., dot( view, n ) ), 8. ) );
+
+					// foam
+					float foamAmount = i.foamAmount;
+
+					// Give the foam some texture
+					float2 foamUV = i.worldXZUndisplaced / 80.;
+					foamUV += 0.02 * n.xz;
+					foamAmount *= tex2D( _FoamTexture, foamUV ).r;
+
+					// Use different thresholds for underwater bubbles (additive) and white foam (on top)
+					float whiteFoam = smoothstep(0.2, 0.7, foamAmount);
+					float bubbleFoam = smoothstep(0.0, 0.5, foamAmount);
+
+					col.xyz += bubbleFoam * _FoamBubbleColor.rgb * _FoamBubbleColor.a;
+					col.xyz = lerp( col.xyz, _FoamWhiteColor, whiteFoam * _FoamWhiteColor.a );
 
 					//float4 uv = i.uvgrab/i.uvgrab.w;
 					//uv.y = 1. - uv.y;
