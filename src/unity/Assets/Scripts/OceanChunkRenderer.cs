@@ -25,9 +25,9 @@ namespace OceanResearch
             // per instance data
 
             // blend closest geometry in/out to avoid pop
-            float meshScaleLerp = _lodIndex == 0 ? OceanRenderer.CAMY_MESH_SCALE_LERP : 0f;
+            float meshScaleLerp = _lodIndex == 0 ? OceanRenderer.Instance.ViewerAltitudeLevelAlpha : 0f;
             // blend furthest normals scale in/out to avoid pop
-            float farNormalsWeight = _lodIndex == _totalLodCount - 1 ? OceanRenderer.CAMY_MESH_SCALE_LERP : 1f;
+            float farNormalsWeight = _lodIndex == _totalLodCount - 1 ? OceanRenderer.Instance.ViewerAltitudeLevelAlpha : 1f;
             _thisRend.material.SetVector( "_InstanceData", new Vector4( meshScaleLerp, farNormalsWeight, _lodIndex ) );
 
             // geometry data

@@ -83,7 +83,7 @@ namespace OceanResearch
             {
                 if( !r || !r.material ) continue;
 
-                float shapeWeight = _biggestLod ? OceanRenderer.CAMY_MESH_SCALE_LERP : 1f;
+                float shapeWeight = _biggestLod ? OceanRenderer.Instance.ViewerAltitudeLevelAlpha : 1f;
                 r.material.SetVector( _waveDataParamsName, new Vector3( texelWidth, textureRes, shapeWeight ) );
                 r.material.SetVector( _waveDataPosParamName, new Vector2( snappedPos.x, snappedPos.z ) );
                 r.material.SetVector( _waveDataPosContParamName, new Vector2( continuousPos.x, continuousPos.z ) );

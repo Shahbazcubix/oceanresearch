@@ -41,12 +41,11 @@ namespace OceanResearch
         [Tooltip( "Generate a wide strip of triangles at the outer edge to extend ocean to edge of view frustum" )]
         bool _generateSkirt = true;
 
-        public static float CAMY_MESH_SCALE_LERP = 0f;
+        float _viewerAltitudeLevelAlpha = 0f;
+        public float ViewerAltitudeLevelAlpha { get { return _viewerAltitudeLevelAlpha; } }
 
         static OceanRenderer _instance;
         public static OceanRenderer Instance { get { return _instance != null ? _instance : (_instance = FindObjectOfType<OceanRenderer>()); } }
-
-        public static float SeaLevel { get { return Instance.transform.position.y; } }
 
         OceanBuilder _oceanBuilder;
 
@@ -75,7 +74,7 @@ namespace OceanResearch
 
             // scale ocean mesh based on camera height to keep uniform detail
             const float HEIGHT_LOD_MUL = 1f; //0.0625f;
-            float camY = Mathf.Abs( Camera.main.transform.position.y - SeaLevel );
+            float camY = Mathf.Abs( Camera.main.transform.position.y - transform.position.y );
             float level = camY * HEIGHT_LOD_MUL;
             level = Mathf.Max( level, _minScale );
             if( _maxScale != -1f ) level = Mathf.Min( level, 1.99f * _maxScale );
@@ -84,7 +83,7 @@ namespace OceanResearch
             float l2 = Mathf.Log( level ) / Mathf.Log( 2f );
             float l2f = Mathf.Floor( l2 );
 
-            CAMY_MESH_SCALE_LERP = _scaleHorizSmoothTransition ? l2 - l2f : 0f;
+            _viewerAltitudeLevelAlpha = _scaleHorizSmoothTransition ? l2 - l2f : 0f;
 
             float scale = Mathf.Pow( 2f, l2f );
 
