@@ -1,5 +1,7 @@
 ﻿// This file is subject to the MIT License as seen in the root of this folder structure (LICENSE)
 
+//#define PROFILE_CONSTRUCTION
+
 using UnityEngine;
 using System.Collections;
 
@@ -16,6 +18,9 @@ namespace OceanResearch
         [HideInInspector]
         public Camera[] _shapeCameras;
 
+        /// <summary>
+        /// Parameters to use for ocean geometry construction
+        /// </summary>
         public class Params
         {
             public float _baseVertDensity = 32f;
@@ -145,16 +150,18 @@ namespace OceanResearch
                 return;
             }
 
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
             if( !UnityEditor.EditorApplication.isPlaying )
             {
                 Debug.LogError( "Ocean mesh meant to be (re)generated in play mode", this );
                 return;
             }
-    #endif
+#endif
 
+#if PROFILE_CONSTRUCTION
             System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
             sw.Start();
+#endif
 
             // create mesh data
             Mesh[] meshInsts = new Mesh[(int)PatchType.Count];
@@ -187,8 +194,10 @@ namespace OceanResearch
                 nextLod.transform.localScale = new Vector3( horizScale, 1f, horizScale );
             }
 
+#if PROFILE_CONSTRUCTION
             sw.Stop();
             Debug.Log( "Finished generating " + parms._lodCount.ToString() + " LODs, time: " + (1000.0*sw.Elapsed.TotalSeconds).ToString(".000") + "ms" );
+#endif
         }
 
         Mesh BuildOceanPatch( PatchType pt, Params parms )
@@ -203,35 +212,27 @@ namespace OceanResearch
             //////////////////////////////////////////////////////////////////////////////////
             // verts
 
-            // skirt widths
-            float swx = 0f, swz = 0f; // 1 when fat, -1 when slim
-            if( pt == PatchType.Fat ) swx = swz = 2f;
-            else if( pt == PatchType.FatX || pt == PatchType.FatXOuter ) swx = 1f;
-            else if( pt == PatchType.FatXZ || pt == PatchType.FatXZOuter ) swx = swz = 1f;
-            else if( pt == PatchType.FatXSlimZ ) { swx = 1f; swz = -1f; }
-            else if( pt == PatchType.SlimX ) swx = -1f;
-            else if( pt == PatchType.SlimXZ ) swx = swz = -1f;
-            else if( pt == PatchType.SlimXFatZ ) { swx = -1f; swz = 1f; }
+            // see comments within PatchType for diagrams of each patch mesh
 
-            int sideLength_squares_x = (int)(parms._baseVertDensity + swx); int sideLength_squares_z = (int)(parms._baseVertDensity + swz);
-            float sideLength_verts_x = parms._baseVertDensity + 1f + swx; float sideLength_verts_z = parms._baseVertDensity + 1f + swz;
+            // skirt widths on left, right, bottom and top (in order)
+            float skirtXminus = 0f, skirtXplus = 0f;
+            float skirtZminus = 0f, skirtZplus = 0f;
+            // set the patch size
+            if( pt == PatchType.Fat ) { skirtXminus = skirtXplus = skirtZminus = skirtZplus = 1f; }
+            else if( pt == PatchType.FatX || pt == PatchType.FatXOuter ) { skirtXplus = 1f; }
+            else if( pt == PatchType.FatXZ || pt == PatchType.FatXZOuter ) { skirtXplus = skirtZplus = 1f; }
+            else if( pt == PatchType.FatXSlimZ ) { skirtXplus = 1f; skirtZplus = -1f; }
+            else if( pt == PatchType.SlimX ) { skirtXplus = -1f; }
+            else if( pt == PatchType.SlimXZ ) { skirtXplus = skirtZplus = -1f; }
+            else if( pt == PatchType.SlimXFatZ ) { skirtXplus = -1f; skirtZplus = 1f; }
 
-            float start_x = -0.5f;
-            float start_z = -0.5f;
-            if( swx == 2f )
-            {
-                start_x -= dx;
-                swx = 1f;
-            }
-            if( swz == 2f )
-            {
-                start_z -= dx;
-                swz = 1f;
-            }
+            float sideLength_verts_x = 1f + parms._baseVertDensity + skirtXminus + skirtXplus;
+            float sideLength_verts_z = 1f + parms._baseVertDensity + skirtZminus + skirtZplus;
 
-            // end is always side of patch + skirt width X dx
-            float end_x = 0.5f + swx * dx;
-            float end_z = 0.5f + swz * dx;
+            float start_x = -0.5f - skirtXminus * dx;
+            float start_z = -0.5f - skirtZminus * dx;
+            float   end_x =  0.5f + skirtXplus * dx;
+            float   end_z =  0.5f + skirtZplus * dx;
 
             for( float j = 0; j < sideLength_verts_z; j++ )
             {
@@ -259,6 +260,9 @@ namespace OceanResearch
 
             //////////////////////////////////////////////////////////////////////////////////
             // indices
+
+            int sideLength_squares_x = (int)sideLength_verts_x - 1;
+            int sideLength_squares_z = (int)sideLength_verts_z - 1;
 
             for( int j = 0; j < sideLength_squares_z; j++ )
             {
@@ -416,6 +420,8 @@ namespace OceanResearch
                 };
             }
 
+            // debug toggle to force all patches to be the same. they'll be made with a surrounding skirt to make sure patches
+            // overlap
             if( parms._forceUniformPatches )
             {
                 for( int i = 0; i < patchTypes.Length; i++ )
