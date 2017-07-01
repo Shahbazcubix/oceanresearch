@@ -11,8 +11,10 @@ namespace OceanResearch
     public class OceanBuilder : MonoBehaviour
     {
 	    public Transform _chunkPrefab;
-        Camera[] _shapeCameras;
         public Transform _shapeCameraPrefab;
+
+        [HideInInspector]
+        public Camera[] _shapeCameras;
 
         public class Params
         {
@@ -433,10 +435,7 @@ namespace OceanResearch
                 inst.localScale = Vector3.one;
 
                 OceanChunkRenderer ocr = inst.GetComponent<OceanChunkRenderer>();
-                ocr._lodIndex = lodIndex;
-                ocr._shapeCameras = (Camera[])_shapeCameras.Clone();
-                ocr._baseVertDensity = parms._baseVertDensity;
-                ocr._biggestLod = lodIndex == parms._lodCount - 1;
+                ocr.SetInstanceData( lodIndex, parms._lodCount, parms._baseVertDensity );
 
                 inst.GetComponent<MeshFilter>().mesh = meshData[(int)patchTypes[i]];
 

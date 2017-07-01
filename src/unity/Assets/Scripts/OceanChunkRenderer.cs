@@ -9,57 +9,35 @@ namespace OceanResearch
     /// </summary>
     public class OceanChunkRenderer : MonoBehaviour
     {
-        [HideInInspector]
-        public int _lodIndex = -1;
-
-        [HideInInspector]
-        public Camera[] _shapeCameras;
-
-        [HideInInspector]
-        public bool _biggestLod = false;
-
-        [HideInInspector]
-        public float _baseVertDensity = 32f;
-
-        // debug
-        public bool _regenMesh = false;
-
-        OceanRenderer _oceanRend;
+        int _lodIndex = -1;
+        int _totalLodCount = -1;
+        float _baseVertDensity = 32f;
         Renderer _thisRend;
 
         void Start()
         {
-            _oceanRend = GetComponentInParent<OceanRenderer>();
             _thisRend = GetComponent<Renderer>();
         }
 
         // Called when visible to a camera
         void OnWillRenderObject()
         {
-            if( _regenMesh )
-            {
-                _regenMesh = false;
-                _oceanRend.RegenMesh();
-            }
-
             // per instance data
-            _thisRend.material.SetFloat( "_LODIndex", (float)_lodIndex );
-            float scaleLerp = _lodIndex == 0 ? OceanRenderer.CAMY_MESH_SCALE_LERP : 0f;
-            _thisRend.material.SetFloat( "_MeshScaleLerp", scaleLerp ); // transitions ocean based on camera height
 
-            // global/per material data - would ideally be set just once..
-            _thisRend.material.SetVector( "_OceanCenterPosWorld", _oceanRend.transform.position );
-            _thisRend.material.SetFloat( "_EnableSmoothLODs", OceanRenderer.Instance._enableSmoothLOD ? 1f : 0f ); // debug
+            // blend closest geometry in/out to avoid pop
+            float meshScaleLerp = _lodIndex == 0 ? OceanRenderer.CAMY_MESH_SCALE_LERP : 0f;
+            // blend furthest normals scale in/out to avoid pop
+            float farNormalsWeight = _lodIndex == _totalLodCount - 1 ? OceanRenderer.CAMY_MESH_SCALE_LERP : 1f;
+            _thisRend.material.SetVector( "_InstanceData", new Vector4( meshScaleLerp, farNormalsWeight, _lodIndex ) );
 
+            // geometry data
             float squareSize = Mathf.Abs( transform.lossyScale.x ) / _baseVertDensity;
             _thisRend.material.SetVector( "_GeomData", new Vector4( squareSize, squareSize * 2f, squareSize * 4f, _baseVertDensity ) );
-            // blend furthest normals scale in/out to avoid pop
-            _thisRend.material.SetFloat( "_FarNormalsWeight", _biggestLod ? OceanRenderer.CAMY_MESH_SCALE_LERP : 1f );
+        }
 
-            // this relies on the render textures being init'd in CreateAssignRenderTexture::Awake().
-            // the only reason I'm doing this here is because the assignments are lost if you edit the shader while running.
-            for( int j = 0; j < _shapeCameras.Length; j++ )
-                _thisRend.material.SetTexture( "_WD_Sampler_" + j.ToString(), _shapeCameras[j].targetTexture );
+        public void SetInstanceData( int lodIndex, int totalLodCount, float baseVertDensity )
+        {
+            _lodIndex = lodIndex; _totalLodCount = totalLodCount; _baseVertDensity = baseVertDensity;
         }
     }
 }

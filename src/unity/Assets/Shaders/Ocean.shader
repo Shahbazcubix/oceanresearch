@@ -15,7 +15,6 @@ Shader "Ocean/Ocean"
 
 	Category
 	{
-
 		// We must be transparent, so other objects are drawn before this one.
 		Tags { "Queue"="Transparent" "RenderType"="Opaque" }
 
@@ -69,6 +68,8 @@ Shader "Ocean/Ocean"
 					UNITY_FOG_COORDS( 3 )
 				};
 
+				// GLOBAL PARAMS
+
 				// shape data
 				// Params: float3(texel size, texture resolution, shape weight multiplier)
 				#define SHAPE_LOD_PARAMS(LODNUM) \
@@ -83,30 +84,27 @@ Shader "Ocean/Ocean"
 				SHAPE_LOD_PARAMS( 3 )
 				SHAPE_LOD_PARAMS( 4 )
 
-
 				uniform float _RefractAmt;
 				uniform float2 _TextureCenterPosXZ;
 				uniform sampler2D_float _CameraDepthTexture;
 
 				uniform sampler2D _Normals;
 
-				// only needed for smallest lod - to lerp out lod before doubling ocean scale
-				uniform float _MeshScaleLerp = 1.0;
-				uniform float _IsSmallestLOD = 0.0; // 1.0 if smallest lod
 				uniform float3 _OceanCenterPosWorld;
 
 				uniform float _EnableSmoothLODs = 1.0;
-				uniform float _LODIndex = 0.;
 
 				uniform float4 _Diffuse;
+
+				// INSTANCE PARAMS
 
 				// Geometry data
 				// xyz: A square is formed by 2 triangles in the mesh. Here xyz is (square size, 2 X square size, next square size)
 				// w: Geometry density - side length of patch measured in squares
 				uniform float4 _GeomData = float4(1.0, 2.0, 4.0, 32.0);
 
-				// Allow furthest normals to be blended in/out to avoid pops when ocean changes scale
-				uniform float _FarNormalsWeight = 1.0;
+				// MeshScaleLerp, FarNormalsWeight, LODIndex (debug), unused
+				uniform float4 _InstanceData = float4(1.0, 1.0, 0.0, 0.0 );
 
 				#define COLOR_COUNT 5.
 
@@ -203,7 +201,8 @@ Shader "Ocean/Ocean"
 					const float BLACK_POINT = .15;
 					const float WHITE_POINT = .8;
 					frac_high = max( (frac_high - BLACK_POINT) / (WHITE_POINT-BLACK_POINT), 0. );
-					frac_high = min( frac_high + _MeshScaleLerp, 1. );
+					const float meshScaleLerp = _InstanceData.x;
+					frac_high = min( frac_high + meshScaleLerp, 1. );
 
 					// now smoothly transition vert layouts between lod levels
 					float2 m = frac( pos_world.xz / SQUARE_SIZE_4 ); // this always returns positive
@@ -315,7 +314,8 @@ Shader "Ocean/Ocean"
 						(tex2D( _Normals, (v1 * _Time.y*spdmulL + i.worldXZ) / nstretch ).wz - .5);
 
 					// blend in next higher scale of normals to obtain continuity
-					float nblend = i.facing.z * _FarNormalsWeight;
+					const float farNormalsWeight = _InstanceData.y;
+					float nblend = i.facing.z * farNormalsWeight;
 					if( nblend > 0.001 )
 					{
 						// next lod level
@@ -379,13 +379,14 @@ Shader "Ocean/Ocean"
 	
 					UNITY_APPLY_FOG(i.fogCoord, col);
 	
-					//if( _LODIndex == 0. )
+					const float lodIndex = _InstanceData.z;
+					//if( lodIndex == 0. )
 					//	col.rgb = float3(1., 0.2, 0.2);
-					//else if( _LODIndex == 1. )
+					//else if( lodIndex == 1. )
 					//	col.rgb = float3(1., 1., 0.2);
-					//else if( _LODIndex == 2. )
+					//else if( lodIndex == 2. )
 					//	col.rgb = float3(0.2, 1., 0.2);
-					//else //if( _LODIndex == 3. )
+					//else //if( lodIndex == 3. )
 					//	col.rgb = float3(0., 0.5, 1.);
 
 					#if defined( DEBUG_SHAPE_SAMPLE )

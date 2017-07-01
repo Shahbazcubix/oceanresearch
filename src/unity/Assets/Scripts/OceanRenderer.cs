@@ -56,10 +56,23 @@ namespace OceanResearch
 
             _oceanBuilder = GetComponent<OceanBuilder>();
             _oceanBuilder.GenerateMesh( MakeBuildParams() );
+
+            SetSmoothLODsShaderParam();
         }
 
         void LateUpdate()
         {
+            // set global shader params
+            Shader.SetGlobalVector( "_OceanCenterPosWorld", transform.position );
+
+            // assign shape textures to shader
+            // this relies on the render textures being init'd in CreateAssignRenderTexture::Awake().
+            // the only reason I'm doing this here is because the assignments are lost if you edit the shader while running.
+            for( int j = 0; j < _oceanBuilder._shapeCameras.Length; j++ )
+            {
+                Shader.SetGlobalTexture( "_WD_Sampler_" + j.ToString(), _oceanBuilder._shapeCameras[j].targetTexture );
+            }
+
             // scale ocean mesh based on camera height to keep uniform detail
             const float HEIGHT_LOD_MUL = 1f; //0.0625f;
             float camY = Mathf.Abs( Camera.main.transform.position.y - SeaLevel );
@@ -80,7 +93,10 @@ namespace OceanResearch
 
         void OnGUI()
         {
+            GUI.changed = false;
             _enableSmoothLOD = GUI.Toggle( new Rect( 0, 0, 150, 25 ), _enableSmoothLOD, "Enable smooth LOD" );
+            if( GUI.changed ) SetSmoothLODsShaderParam();
+
             _freezeTime = GUI.Toggle( new Rect( 0, 75, 100, 25 ), _freezeTime, "Freeze waves" );
         }
 
@@ -98,6 +114,11 @@ namespace OceanResearch
         public void RegenMesh()
         {
             _oceanBuilder.GenerateMesh( MakeBuildParams() );
+        }
+
+        void SetSmoothLODsShaderParam()
+        {
+            Shader.SetGlobalFloat( "_EnableSmoothLODs", _enableSmoothLOD ? 1f : 0f ); // debug
         }
     }
 }
