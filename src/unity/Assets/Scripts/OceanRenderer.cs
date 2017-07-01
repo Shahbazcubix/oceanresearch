@@ -58,7 +58,7 @@ namespace OceanResearch
             _oceanBuilder.GenerateMesh( MakeBuildParams() );
         }
 
-        void Update()
+        void LateUpdate()
         {
             // scale ocean mesh based on camera height to keep uniform detail
             const float HEIGHT_LOD_MUL = 1f; //0.0625f;
