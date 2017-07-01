@@ -6,7 +6,7 @@ using System.Collections.Generic;
 namespace OceanResearch
 {
     /// <summary>
-    /// Positions wave data render camera. Snaps to shape texels to avoid aliasing. May be combined iwth Circle Offset component to place in front of camera.
+    /// Positions wave data render camera. Snaps to shape texels to avoid aliasing. May be combined with Circle Offset component to place in front of camera.
     /// </summary>
     [RequireComponent( typeof( Camera ) )]
     public class WaveDataCam : MonoBehaviour
@@ -58,8 +58,15 @@ namespace OceanResearch
             float texelWidth = 2f * camera.orthographicSize / textureRes;
             // snap so that shape texels are stationary
             Vector3 continuousPos = transform.position;
-            //transform.position = continuousPos
-            //    - new Vector3( Mathf.Repeat( continuousPos.x, texelWidth ), 0f, Mathf.Repeat( continuousPos.z, texelWidth ) );
+            Vector3 snappedPos = continuousPos
+                - new Vector3( Mathf.Repeat( continuousPos.x, texelWidth ), 0f, Mathf.Repeat( continuousPos.z, texelWidth ) );
+
+            // set projection matrix to snap to texels
+            camera.ResetProjectionMatrix();
+            Matrix4x4 P = camera.projectionMatrix, T = new Matrix4x4();
+            T.SetTRS( new Vector3( continuousPos.x - snappedPos.x, continuousPos.z - snappedPos.z ), Quaternion.identity, Vector3.one );
+            P = P * T;
+            camera.projectionMatrix = P;
 
 
             if( _renderers == null || _renderers.Count == 0 || _renderers[0] == null )
@@ -78,7 +85,7 @@ namespace OceanResearch
 
                 float shapeWeight = _biggestLod ? OceanRenderer.CAMY_MESH_SCALE_LERP : 1f;
                 r.material.SetVector( _waveDataParamsName, new Vector3( texelWidth, textureRes, shapeWeight ) );
-                r.material.SetVector( _waveDataPosParamName, new Vector2( transform.position.x, transform.position.z ) );
+                r.material.SetVector( _waveDataPosParamName, new Vector2( snappedPos.x, snappedPos.z ) );
                 r.material.SetVector( _waveDataPosContParamName, new Vector2( continuousPos.x, continuousPos.z ) );
             }
         }
