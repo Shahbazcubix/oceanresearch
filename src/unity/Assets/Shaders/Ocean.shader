@@ -4,7 +4,6 @@ Shader "Ocean/Ocean"
 {
 	Properties
 	{
-		_RefractAmt  ("Refract Strengh", range (0,1)) = 0
 		_Normals ( "Normals", 2D ) = "bump" {}
 		_Skybox ("Skybox", CUBE) = "" {}
 		_Diffuse ("Diffuse", Color) = (0.2, 0.05, 0.05, 1.0)
@@ -15,21 +14,10 @@ Shader "Ocean/Ocean"
 
 	Category
 	{
-		// We must be transparent, so other objects are drawn before this one.
-		Tags { "Queue"="Transparent" "RenderType"="Opaque" }
+		Tags {}
 
 		SubShader
 		{
-			// This pass grabs the screen behind the object into a texture.
-			// We can access the result in the next pass as _GrabTexture
-			GrabPass
-			{
-				Name "BASE"
-				Tags { "LightMode" = "Always" }
-			}
-		
-			// Main pass: Take the texture grabbed above and use the bumpmap to perturb it
-			// on to the screen
 			Pass
 			{
 				Name "BASE"
@@ -53,12 +41,9 @@ Shader "Ocean/Ocean"
 				struct v2f
 				{
 					float4 vertex : SV_POSITION;
-					float4 uvgrab : TEXCOORD0;
 					float3 n : TEXCOORD1;
-					float3 facing : TEXCOORD5;
-					float3 view : TEXCOORD6;
-					float2 worldXZ : TEXCOORD7;
-					float foamAmount : TEXCOORD8;
+					float2 foamAmount_lodAlpha : TEXCOORD5;
+					float3 worldPos : TEXCOORD7;
 					float2 worldXZUndisplaced : TEXCOORD9;
 					
 					#if defined( DEBUG_SHAPE_SAMPLE )
@@ -84,17 +69,9 @@ Shader "Ocean/Ocean"
 				SHAPE_LOD_PARAMS( 3 )
 				SHAPE_LOD_PARAMS( 4 )
 
-				uniform float _RefractAmt;
-				uniform float2 _TextureCenterPosXZ;
-				uniform sampler2D_float _CameraDepthTexture;
-
-				uniform sampler2D _Normals;
-
 				uniform float3 _OceanCenterPosWorld;
-
 				uniform float _EnableSmoothLODs = 1.0;
-
-				uniform float4 _Diffuse;
+				uniform float _MyTime;
 
 				// INSTANCE PARAMS
 
@@ -157,11 +134,11 @@ Shader "Ocean/Ocean"
 					if( wt > 0. ) \
 					{ \
 						float3 disp_##LODNUM, n_##LODNUM; float wt_##LODNUM, foamAmount_##LODNUM; \
-						SampleDisplacements( _WD_Sampler_##LODNUM, _WD_Pos_##LODNUM, _WD_Pos_Cont_##LODNUM, _WD_Params_##LODNUM.y, _WD_Params_##LODNUM.x, idealSquareSize, pos_world.xz, disp_##LODNUM, n_##LODNUM, wt_##LODNUM, foamAmount_##LODNUM ); \
+						SampleDisplacements( _WD_Sampler_##LODNUM, _WD_Pos_##LODNUM, _WD_Pos_Cont_##LODNUM, _WD_Params_##LODNUM.y, _WD_Params_##LODNUM.x, idealSquareSize, o.worldPos.xz, disp_##LODNUM, n_##LODNUM, wt_##LODNUM, foamAmount_##LODNUM ); \
 						wt_##LODNUM *= _WD_Params_##LODNUM.z; \
-						pos_world += wt * wt_##LODNUM * disp_##LODNUM; \
+						o.worldPos += wt * wt_##LODNUM * disp_##LODNUM; \
 						o.n.xz += wt * wt_##LODNUM * n_##LODNUM.xz; \
-						o.foamAmount += wt * wt_##LODNUM * foamAmount_##LODNUM; \
+						o.foamAmount_lodAlpha.x += wt * wt_##LODNUM * foamAmount_##LODNUM; \
 						wt *= (1. - wt_##LODNUM); \
 						debugtint = lerp( debugtint, tintCols[##LODNUM], wt ); \
 					}
@@ -176,14 +153,14 @@ Shader "Ocean/Ocean"
 					const float DENSITY = _GeomData.w;
 
 					// move to world
-					float3 pos_world = mul( unity_ObjectToWorld, v.vertex );
+					o.worldPos = mul( unity_ObjectToWorld, v.vertex );
 	
 					// snap the verts to the grid
 					// The snap size should be twice the original size to keep the shape of the eight triangles (otherwise the edge layout changes).
-					pos_world.xz -= fmod( _OceanCenterPosWorld.xz, SQUARE_SIZE_2 ); // this uses hlsl fmod, not glsl mod (sign is different).
+					o.worldPos.xz -= fmod( _OceanCenterPosWorld.xz, SQUARE_SIZE_2 ); // this uses hlsl fmod, not glsl mod (sign is different).
 	
 					// how far are we into the current LOD? compute by comparing the desired square size with the actual square size
-					float2 offsetFromCenter = float2( abs( pos_world.x - _OceanCenterPosWorld.x ), abs( pos_world.z - _OceanCenterPosWorld.z ) );
+					float2 offsetFromCenter = float2( abs( o.worldPos.x - _OceanCenterPosWorld.x ), abs( o.worldPos.z - _OceanCenterPosWorld.z ) );
 					float l1norm = max( offsetFromCenter.x, offsetFromCenter.y );
 					float idealSquareSize = l1norm / DENSITY;
 					// this is to address numerical issues with the normal (errors are very visible at close ups of specular highlights).
@@ -205,22 +182,18 @@ Shader "Ocean/Ocean"
 					frac_high = min( frac_high + meshScaleLerp, 1. );
 
 					// now smoothly transition vert layouts between lod levels
-					float2 m = frac( pos_world.xz / SQUARE_SIZE_4 ); // this always returns positive
+					float2 m = frac( o.worldPos.xz / SQUARE_SIZE_4 ); // this always returns positive
 					float2 offset = m - 0.5;
 					// check if vert is within one square from the center point which the verts move towards
 					float minRadius = 0.26 *_EnableSmoothLODs; //0.26 is 0.25 plus a small "epsilon" - should solve numerical issues
-					if( abs( offset.x ) < minRadius ) pos_world.x += offset.x * frac_high * SQUARE_SIZE_4;
-					if( abs( offset.y ) < minRadius ) pos_world.z += offset.y * frac_high * SQUARE_SIZE_4;
+					if( abs( offset.x ) < minRadius ) o.worldPos.x += offset.x * frac_high * SQUARE_SIZE_4;
+					if( abs( offset.y ) < minRadius ) o.worldPos.z += offset.y * frac_high * SQUARE_SIZE_4;
 	
-	
-					// uv
-					// set the MIP based on the current square size, with the transition to the higher mip
-					// hb using hte mip chain does NOT work out well when moving the shape texture around, because mip hierarchy will pop. this is knocked out below
-					// and in WaveDataCam::Start()
-	
+
+					// sample shape textures (all of them for now, but theoretically should only ever need to sample 2 of them)
 					o.n = float3(0., 1., 0.);
-					o.foamAmount = 0.;
-					o.worldXZUndisplaced = pos_world.xz;
+					o.foamAmount_lodAlpha.x = 0.;
+					o.worldXZUndisplaced = o.worldPos.xz;
 
 					float3 debugtint = (float3)0.;
 					float3 tintCols[5];
@@ -238,126 +211,68 @@ Shader "Ocean/Ocean"
 					#endif
 
 					// view-projection	
-					o.vertex = mul( UNITY_MATRIX_VP, float4(pos_world,1.) );
-					o.worldXZ = pos_world.xz;
+					o.vertex = mul( UNITY_MATRIX_VP, float4(o.worldPos,1.) );
 
-					// used to scale normals in the fragment shader
-					o.facing.z = frac_high;
-	
-					// refract starts here
-	
-					#if UNITY_UV_STARTS_AT_TOP
-					float scale = -1.0;
-					#else
-					float scale = 1.0;
-					#endif
-					o.uvgrab.xy = (float2(o.vertex.x, o.vertex.y*scale) + o.vertex.w) * 0.5;
-					o.uvgrab.zw = o.vertex.zw;
-					//o.uvmain = TRANSFORM_TEX( v.texcoord, _WD_Sampler_0 );
-	
+					// used to blend normals in the fragment shader
+					o.foamAmount_lodAlpha.y = frac_high;
+
 					UNITY_TRANSFER_FOG(o,o.vertex);
-	
-					float3 V = _WorldSpaceCameraPos - pos_world.xyz;
-					o.facing.y = 0.;
-					o.view = V;
-					o.facing.x = max( dot( o.view, o.n ), 0. );
+
 					return o;
 				}
 
-				sampler2D _GrabTexture;
-				float4 _GrabTexture_TexelSize;
-				sampler2D _MainTex;
+				uniform float4 _Diffuse;
+				uniform sampler2D _Normals;
 				samplerCUBE _Skybox;
 				sampler2D _FoamTexture;
 				float4 _FoamWhiteColor;
 				float4 _FoamBubbleColor;
 
-				#define SUN_DIR float3(-0.70710678,0.,-.70710678)
-
-				float3 bgSkyColor( float3 rd )
-				{
-					rd.y = max( rd.y, 0. );
-
-					float3 col = (float3)0.;
-
-					// horizon
-					float3 hor = (float3)0.;
-					float hort = 1. - clamp( abs( rd.y ), 0., 1. );
-					hor += 0.5*float3(.99, .5, .0)*exp2( hort*8. - 8. );
-					hor += 0.1*float3(.5, .9, 1.)*exp2( hort*3. - 3. );
-					hor += 0.55*float3(.6, .6, .9); //*exp2(hort*1.-1.);
-					col += hor;
-
-					// sun
-					float sun = clamp( dot( SUN_DIR, rd ), 0.0, 1.0 );
-					col += .2*float3(1.0, 0.3, 0.2)*pow( sun, 2.0 );
-					col += .5*float3(1., .9, .9)*exp2( sun*650. - 650. );
-					col += .1*float3(1., 1., 0.1)*exp2( sun*100. - 100. );
-					col += .3*float3(1., .7, 0.)*exp2( sun*50. - 50. );
-					col += .5*float3(1., 0.3, 0.05)*exp2( sun*10. - 10. );
-
-					return col;
-				}
-
-				half4 frag (v2f i) : SV_Target
+				half4 frag(v2f i) : SV_Target
 				{
 					// normal - geom + normal mapping
-					float3 n = i.n;
-					float th0 = .35, th1 = 3.7;
-					float2 v0 = float2(cos( th0 ), sin( th0 )), v1 = float2(cos( th1 ), sin( th1 ));
-					const bool USE_LOG_SCALE = false;
+					float2 v0 = float2(0.94,0.34), v1 = float2(-0.85,-0.53);
 					float geomSquareSize = _GeomData.x;
 					float nstretch = 80.*geomSquareSize; // normals scaled with geometry
 					float spdmulL = log( 1. + 2.*geomSquareSize ) * 1.875;
 					float2 norm = 
-						(tex2D( _Normals, (v0 * _Time.y*spdmulL + i.worldXZ) / nstretch ).wz - .5) +
-						(tex2D( _Normals, (v1 * _Time.y*spdmulL + i.worldXZ) / nstretch ).wz - .5);
+						tex2D( _Normals, (v0*_MyTime*spdmulL + i.worldPos.xz) / nstretch ).wz +
+						tex2D( _Normals, (v1*_MyTime*spdmulL + i.worldPos.xz) / nstretch ).wz;
 
 					// blend in next higher scale of normals to obtain continuity
 					const float farNormalsWeight = _InstanceData.y;
-					float nblend = i.facing.z * farNormalsWeight;
+					float nblend = i.foamAmount_lodAlpha.y * farNormalsWeight;
 					if( nblend > 0.001 )
 					{
 						// next lod level
 						nstretch *= 2.;
 						float spdmulH = log( 1. + 4.*geomSquareSize ) * 1.875;
 						norm = lerp( norm,
-							(tex2D( _Normals, (v0 * _Time.y*spdmulH + i.worldXZ) / nstretch ).wz - .5) +
-							(tex2D( _Normals, (v1 * _Time.y*spdmulH + i.worldXZ) / nstretch ).wz - .5),
+							tex2D( _Normals, (v0*_MyTime*spdmulH + i.worldPos.xz) / nstretch ).wz +
+							tex2D( _Normals, (v1*_MyTime*spdmulH + i.worldPos.xz) / nstretch ).wz,
 							nblend );
 					}
-
-					n.xz -= 0.25 * norm;
+					
+					float3 n = i.n;
+					// modify geom normal with result from normal maps. -1 because we did not subtract 0.5 when sampling
+					// normal maps above
+					n.xz -= 0.25 * (norm - 1.0);
 					n.y = 1.;
 					n = normalize( n );
 
 					// shading
 					half4 col = (half4)0.;
 	
-					// calculate perturbed coordinates
-					// dz - commented, but I'll leave it in for now in case we want to go transparent
-					/*
-					float2 offset = -l * mul(UNITY_MATRIX_V,float4(n,0.)).xy/i.facing.y; // divide by viewz to ramp down
-					float4 refractUV = i.uvgrab;
-					refractUV.xy = _RefractAmt * offset * i.uvgrab.z + i.uvgrab.xy;
-					col = tex2Dproj( _GrabTexture, UNITY_PROJ_COORD(refractUV));
-					col.xyz = float3(0.7,.7,.7);
-	
-					// blue tint
-					col.xyz *= float3(0.8, 0.5, 1.3) * 0.2;
-					*/
-
 					// Diffuse color
 					col = _Diffuse;
 
 					// fresnel / reflection
-					float3 view = normalize( i.view );
-				//	float3 skyColor = bgSkyColor( reflect( -view, n ) );
-					float3 skyColor = texCUBE(_Skybox, normalize( reflect(-view, n) ));
+					float3 view = normalize( _WorldSpaceCameraPos - i.worldPos );
+					float3 skyColor = texCUBE(_Skybox, reflect(-view, n) );
 					col.xyz = lerp( col.xyz, skyColor, pow( 1. - max( 0., dot( view, n ) ), 8. ) );
 
 					// foam
-					float foamAmount = i.foamAmount;
+					float foamAmount = i.foamAmount_lodAlpha.x;
 
 					// Give the foam some texture
 					float2 foamUV = i.worldXZUndisplaced / 80.;
@@ -370,16 +285,10 @@ Shader "Ocean/Ocean"
 
 					col.xyz += bubbleFoam * _FoamBubbleColor.rgb * _FoamBubbleColor.a;
 					col.xyz = lerp( col.xyz, _FoamWhiteColor, whiteFoam * _FoamWhiteColor.a );
-
-					//float4 uv = i.uvgrab/i.uvgrab.w;
-					//uv.y = 1. - uv.y;
-					//float d = LinearEyeDepth( tex2D( _CameraDepthTexture, uv.xy ).x );
-					//float transmittance = exp( -0.08 * max(0.,d-i.facing.y) ); // THIS IS WRONG - d is viewZ whereas i.facing.y is distance to surface
-					//col.xyz = lerp( col.xyz, float3(.3,.7,.8), 1.-transmittance );
 	
 					UNITY_APPLY_FOG(i.fogCoord, col);
 	
-					const float lodIndex = _InstanceData.z;
+					//const float lodIndex = _InstanceData.z;
 					//if( lodIndex == 0. )
 					//	col.rgb = float3(1., 0.2, 0.2);
 					//else if( lodIndex == 1. )
@@ -404,17 +313,5 @@ Shader "Ocean/Ocean"
 				ENDCG
 			}
 		}
-
-		// ------------------------------------------------------------------
-		// Fallback for older cards and Unity non-Pro
-		SubShader
-		{
-			Blend DstColor Zero
-			Pass {
-				Name "BASE"
-				SetTexture [_MainTex] {	combine texture }
-			}
-		}
 	}
-
 }
