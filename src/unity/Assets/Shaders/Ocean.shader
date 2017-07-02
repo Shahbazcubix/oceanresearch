@@ -61,13 +61,11 @@ Shader "Ocean/Ocean"
 					uniform sampler2D _WD_Sampler_##LODNUM; \
 					uniform float3 _WD_Params_##LODNUM; \
 					uniform float2 _WD_Pos_##LODNUM; \
-					uniform float2 _WD_Pos_Cont_##LODNUM;
+					uniform float2 _WD_Pos_Cont_##LODNUM; \
+					uniform int _WD_LodIdx_##LODNUM;
 
 				SHAPE_LOD_PARAMS( 0 )
 				SHAPE_LOD_PARAMS( 1 )
-				SHAPE_LOD_PARAMS( 2 )
-				SHAPE_LOD_PARAMS( 3 )
-				SHAPE_LOD_PARAMS( 4 )
 
 				uniform float3 _OceanCenterPosWorld;
 				uniform float _EnableSmoothLODs = 1.0;
@@ -140,8 +138,8 @@ Shader "Ocean/Ocean"
 						o.worldPos += wt * wt_##LODNUM * disp_##LODNUM; \
 						o.n.xz += wt * wt_##LODNUM * n_##LODNUM.xz; \
 						o.foamAmount_lodAlpha.x += wt * wt_##LODNUM * foamAmount_##LODNUM; \
+						debugtint += wt * wt_##LODNUM * tintCols[_WD_LodIdx_##LODNUM]; \
 						wt *= (1. - wt_##LODNUM); \
-						debugtint = lerp( debugtint, tintCols[##LODNUM], wt ); \
 					}
 
 
@@ -203,9 +201,6 @@ Shader "Ocean/Ocean"
 					float wt = 1.;
 					SAMPLE_SHAPE( 0 );
 					SAMPLE_SHAPE( 1 );
-					SAMPLE_SHAPE( 2 );
-					SAMPLE_SHAPE( 3 );
-					SAMPLE_SHAPE( 4 );
 
 					#if defined( DEBUG_SHAPE_SAMPLE )
 					o.debugtint = debugtint;

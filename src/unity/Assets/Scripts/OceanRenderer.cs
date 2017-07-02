@@ -49,6 +49,7 @@ namespace OceanResearch
         public static OceanRenderer Instance { get { return _instance != null ? _instance : (_instance = FindObjectOfType<OceanRenderer>()); } }
 
         OceanBuilder _oceanBuilder;
+        public OceanBuilder Builder { get { return _oceanBuilder; } }
 
         void Start()
         {
@@ -70,14 +71,6 @@ namespace OceanResearch
             // set global shader params
             Shader.SetGlobalVector( "_OceanCenterPosWorld", transform.position );
             Shader.SetGlobalFloat( "_MyTime", _elapsedTime );
-
-            // assign shape textures to shader
-            // this relies on the render textures being init'd in CreateAssignRenderTexture::Awake().
-            // the only reason I'm doing this here is because the assignments are lost if you edit the shader while running.
-            for( int j = 0; j < _oceanBuilder._shapeCameras.Length; j++ )
-            {
-                Shader.SetGlobalTexture( "_WD_Sampler_" + j.ToString(), _oceanBuilder._shapeCameras[j].targetTexture );
-            }
 
             // scale ocean mesh based on camera height to keep uniform detail
             const float HEIGHT_LOD_MUL = 1f; //0.0625f;

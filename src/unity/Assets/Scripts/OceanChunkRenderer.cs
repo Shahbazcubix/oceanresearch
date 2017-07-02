@@ -35,6 +35,20 @@ namespace OceanResearch
             float normalScrollSpeed0 = Mathf.Log( 1f + 2f * squareSize ) * 1.875f;
             float normalScrollSpeed1 = Mathf.Log( 1f + 4f * squareSize ) * 1.875f;
             _thisRend.material.SetVector( "_GeomData", new Vector4( squareSize, normalScrollSpeed0, normalScrollSpeed1, _baseVertDensity ) );
+
+            // assign shape textures to shader
+            // this relies on the render textures being init'd in CreateAssignRenderTexture::Awake().
+            WaveDataCam wdc0 = OceanRenderer.Instance.Builder._shapeCameras[_lodIndex].GetComponent<WaveDataCam>();
+            wdc0.ApplyMaterialParams( 0, _thisRend.material );
+            WaveDataCam wdc1 = (_lodIndex + 1) < OceanRenderer.Instance.Builder._shapeCameras.Length ? OceanRenderer.Instance.Builder._shapeCameras[_lodIndex + 1].GetComponent<WaveDataCam>() : null;
+            if( wdc1 )
+            {
+                wdc1.ApplyMaterialParams( 1, _thisRend.material );
+            }
+            else
+            {
+                _thisRend.material.SetTexture( "_WD_Sampler_1", null );
+            }
         }
 
         public void SetInstanceData( int lodIndex, int totalLodCount, float baseVertDensity )

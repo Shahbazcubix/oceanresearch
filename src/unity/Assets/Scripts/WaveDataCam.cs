@@ -1,7 +1,6 @@
 ﻿// This file is subject to the MIT License as seen in the root of this folder structure (LICENSE)
 
 using UnityEngine;
-using System.Collections.Generic;
 
 namespace OceanResearch
 {
@@ -20,6 +19,15 @@ namespace OceanResearch
 
         int _shapeRes = 512;
 
+        struct RenderData
+        {
+            public float _texelWidth;
+            public float _textureRes;
+            public Vector3 _posContinuous;
+            public Vector3 _posSnapped;
+        }
+        RenderData _renderData = new RenderData();
+
         void Start()
         {
             if( camera.targetTexture )
@@ -31,13 +39,6 @@ namespace OceanResearch
             }
 
             camera.depthTextureMode = DepthTextureMode.None;
-
-            _waveDataPosParamName = "_WD_Pos_" + _wdRes.ToString();
-            _waveDataParamsName = "_WD_Params_" + _wdRes.ToString();
-            _waveDataPosContParamName = "_WD_Pos_Cont_" + _wdRes.ToString();
-
-            // gather list of the ocean chunk renderers
-            FindOceanRenderers();
         }
 
         // script execution order ensures this runs after CircleOffset
@@ -56,48 +57,34 @@ namespace OceanResearch
                 camera.targetTexture.width = camera.targetTexture.height = _shapeRes;
                 camera.targetTexture.Create();
             }
-            float textureRes = (float)camera.targetTexture.width;
-            float texelWidth = 2f * camera.orthographicSize / textureRes;
+            _renderData._textureRes = (float)camera.targetTexture.width;
+            _renderData._texelWidth = 2f * camera.orthographicSize / _renderData._textureRes;
             // snap so that shape texels are stationary
-            Vector3 continuousPos = transform.position;
-            Vector3 snappedPos = continuousPos
-                - new Vector3( Mathf.Repeat( continuousPos.x, texelWidth ), 0f, Mathf.Repeat( continuousPos.z, texelWidth ) );
+            _renderData._posContinuous = transform.position;
+            _renderData._posSnapped = _renderData._posContinuous
+                - new Vector3( Mathf.Repeat( _renderData._posContinuous.x, _renderData._texelWidth ), 0f, Mathf.Repeat( _renderData._posContinuous.z, _renderData._texelWidth ) );
 
             // set projection matrix to snap to texels
             camera.ResetProjectionMatrix();
             Matrix4x4 P = camera.projectionMatrix, T = new Matrix4x4();
-            T.SetTRS( new Vector3( continuousPos.x - snappedPos.x, continuousPos.z - snappedPos.z ), Quaternion.identity, Vector3.one );
+            T.SetTRS( new Vector3( _renderData._posContinuous.x - _renderData._posSnapped.x, _renderData._posContinuous.z - _renderData._posSnapped.z ), Quaternion.identity, Vector3.one );
             P = P * T;
             camera.projectionMatrix = P;
+        }
 
-
-            if( _renderers == null || _renderers.Count == 0 || _renderers[0] == null )
-            {
-                FindOceanRenderers();
-
-                if( _renderers.Count == 0 || _renderers[0] == null )
-                {
-                    Debug.LogWarning( "No Renderer components on OceanChunkRenderers found.", this );
-                }
-            }
-
-            foreach( Renderer r in _renderers )
-            {
-                if( !r || !r.material ) continue;
-
-                float shapeWeight = _biggestLod ? OceanRenderer.Instance.ViewerAltitudeLevelAlpha : 1f;
-                r.material.SetVector( _waveDataParamsName, new Vector3( texelWidth, textureRes, shapeWeight ) );
-                r.material.SetVector( _waveDataPosParamName, new Vector2( snappedPos.x, snappedPos.z ) );
-                r.material.SetVector( _waveDataPosContParamName, new Vector2( continuousPos.x, continuousPos.z ) );
-            }
+        public void ApplyMaterialParams( int shapeSlot, Material mat )
+        {
+            mat.SetTexture( "_WD_Sampler_" + shapeSlot.ToString(), camera.targetTexture );
+            float shapeWeight = _biggestLod ? OceanRenderer.Instance.ViewerAltitudeLevelAlpha : 1f;
+            mat.SetVector( "_WD_Params_" + shapeSlot.ToString(), new Vector3( _renderData._texelWidth, _renderData._textureRes, shapeWeight ) );
+            mat.SetVector( "_WD_Pos_" + shapeSlot.ToString(), new Vector2( _renderData._posSnapped.x, _renderData._posSnapped.z ) );
+            mat.SetVector( "_WD_Pos_Cont_" + shapeSlot.ToString(), new Vector2( _renderData._posContinuous.x, _renderData._posContinuous.z ) );
+            mat.SetInt( "_WD_LodIdx_" + shapeSlot.ToString(), _wdRes );
         }
 
         void OnGUI()
         {
             float w = 125f;
-
-            // see comment above
-            //m_moveWithShape = GUI.Toggle( new Rect(0,50,w,25), m_moveWithShape, "Move shape" );
 
             float yoff = 50f * (float)_wdRes;
 
@@ -110,22 +97,6 @@ namespace OceanResearch
             float res = GUI.HorizontalSlider( new Rect( 0, 125 + yoff, w, 25 ), (int)(Mathf.Log( (float)_shapeRes ) / Mathf.Log( 2f )), 5, 11 );
             res = Mathf.Pow( 2f, Mathf.Floor( res ) );
             _shapeRes = (int)res;
-        }
-
-        List<Renderer> _renderers = null;
-        void FindOceanRenderers()
-        {
-            _renderers = new List<Renderer>();
-
-            OceanChunkRenderer[] ocrs = FindObjectsOfType<OceanChunkRenderer>();
-            foreach( var ocr in ocrs )
-            {
-                Renderer r = ocr.GetComponent<Renderer>();
-                if( r != null )
-                {
-                    _renderers.Add( r );
-                }
-            }
         }
 
         Camera _camera; new Camera camera { get { return _camera != null ? _camera : (_camera = GetComponent<Camera>()); } }
