@@ -22,13 +22,15 @@ namespace OceanResearch
 
         void Start()
         {
-            if( camera && camera.targetTexture )
+            if( camera.targetTexture )
             {
                 // hb using the mip chain does NOT work out well when moving the shape texture around, because mip hierarchy will pop when the position
                 // snaps. this is knocked out by the CreateAssignRenderTexture script.
                 //camera.targetTexture.useMipMap = false;
                 _shapeRes = camera.targetTexture.width;
             }
+
+            camera.depthTextureMode = DepthTextureMode.None;
 
             _waveDataPosParamName = "_WD_Pos_" + _wdRes.ToString();
             _waveDataParamsName = "_WD_Params_" + _wdRes.ToString();
