@@ -97,14 +97,14 @@ Shader "Ocean/Ocean"
 					float2 offCont = (i_samplePos - i_centerPosCont) / (i_texelSize*i_res);
 					float offContL1 = max( abs( offCont.x ), abs( offCont.y ) );
 
-					// start fading 32 texels before the edge, wt goes to 0 within 4 texels of edge. a texel is the same
+					// start fading before the edge of the shape texture. these values are hand tweaked. 
 					// as a vert, and the verts are lodded out at the edges so 1 geometry square is 2 texels wide.
-					o_wt = smoothstep( 0.5 - 4./i_res, .5-32./i_res, offContL1 );
+					o_wt = smoothstep( 0.4678, 0.28125, offContL1 );
 
-					if( o_wt <= 0.001 )
+					if( o_wt <= 0.0 )
 					{
-						o_disp = o_n = 0.;
-						o_foamAmount = 0.;
+						o_disp = o_n = 0.0;
+						o_foamAmount = 0.0;
 						return;
 					}
 
@@ -128,20 +128,6 @@ Shader "Ocean/Ocean"
 					float det = (du.x * du.w - du.y * du.z) / (dd.z * dd.z);
 					o_foamAmount = 1. - smoothstep(0.0, 2.0, det);
 				}
-
-				#define SAMPLE_SHAPE(LODNUM) \
-					if( wt > 0. ) \
-					{ \
-						float3 disp_##LODNUM, n_##LODNUM; float wt_##LODNUM, foamAmount_##LODNUM; \
-						SampleDisplacements( _WD_Sampler_##LODNUM, _WD_Pos_##LODNUM, _WD_Pos_Cont_##LODNUM, _WD_Params_##LODNUM.y, _WD_Params_##LODNUM.x, idealSquareSize, o.worldPos.xz, disp_##LODNUM, n_##LODNUM, wt_##LODNUM, foamAmount_##LODNUM ); \
-						wt_##LODNUM *= _WD_Params_##LODNUM.z; \
-						o.worldPos += wt * wt_##LODNUM * disp_##LODNUM; \
-						o.n.xz += wt * wt_##LODNUM * n_##LODNUM.xz; \
-						o.foamAmount_lodAlpha.x += wt * wt_##LODNUM * foamAmount_##LODNUM; \
-						debugtint += wt * wt_##LODNUM * tintCols[_WD_LodIdx_##LODNUM]; \
-						wt *= (1. - wt_##LODNUM); \
-					}
-
 
 				v2f vert( appdata_t v )
 				{
@@ -189,22 +175,44 @@ Shader "Ocean/Ocean"
 					if( abs( offset.y ) < minRadius ) o.worldPos.z += offset.y * frac_high * SQUARE_SIZE_4;
 	
 
-					// sample shape textures (all of them for now, but theoretically should only ever need to sample 2 of them)
+					// sample shape textures - always lerp between 2 scales, so sample up to two textures
+
 					o.n = float3(0., 1., 0.);
 					o.foamAmount_lodAlpha.x = 0.;
 					o.worldXZUndisplaced = o.worldPos.xz;
 
-					float3 debugtint = (float3)0.;
-					float3 tintCols[5];
-					tintCols[0] = float3(1., 0., 0.); tintCols[1] = float3(1., 1., 0.); tintCols[2] = float3(0., 1., 0.); tintCols[3] = float3(0., 1., 1.); tintCols[4] = float3(0., 0., 1.);
-
-					float wt = 1.;
-					SAMPLE_SHAPE( 0 );
-					SAMPLE_SHAPE( 1 );
-
 					#if defined( DEBUG_SHAPE_SAMPLE )
-					o.debugtint = debugtint;
+					o.debugtint = (float3)0.;
+					float3 tintCols[5]; tintCols[0] = float3(1., 0., 0.); tintCols[1] = float3(1., 1., 0.); tintCols[2] = float3(0., 1., 0.); tintCols[3] = float3(0., 1., 1.); tintCols[4] = float3(0., 0., 1.);
 					#endif
+
+					// sample first shape texture
+					float wt_0 = 0.;
+					float3 disp_0, n_0; float foamAmount_0;
+					SampleDisplacements( _WD_Sampler_0, _WD_Pos_0, _WD_Pos_Cont_0, _WD_Params_0.y, _WD_Params_0.x, idealSquareSize, o.worldPos.xz, disp_0, n_0, wt_0, foamAmount_0 );
+					wt_0 *= _WD_Params_0.z;
+					o.worldPos += wt_0 * disp_0;
+					o.n.xz += wt_0 * n_0.xz;
+					o.foamAmount_lodAlpha.x += wt_0 * foamAmount_0;
+					#if defined( DEBUG_SHAPE_SAMPLE )
+					o.debugtint += wt_0 * tintCols[_WD_LodIdx_0];
+					#endif
+
+					// sample second shape texture
+					if( wt_0 < 1.0 )
+					{
+						float3 disp_1, n_1; float foamAmount_1;
+						float wt_dummy;
+						SampleDisplacements( _WD_Sampler_1, _WD_Pos_1, _WD_Pos_Cont_1, _WD_Params_1.y, _WD_Params_1.x, idealSquareSize, o.worldPos.xz, disp_1, n_1, wt_dummy, foamAmount_1 );
+						float wt_1 = (1.0 - wt_0) * _WD_Params_1.z;
+						o.worldPos += wt_1 * disp_1;
+						o.n.xz += wt_1 * n_1.xz;
+						o.foamAmount_lodAlpha.x += wt_1 * foamAmount_1;
+						#if defined( DEBUG_SHAPE_SAMPLE )
+						o.debugtint += wt_1 * tintCols[_WD_LodIdx_1];
+						#endif
+					}
+
 
 					// view-projection	
 					o.vertex = mul( UNITY_MATRIX_VP, float4(o.worldPos,1.) );
@@ -299,11 +307,6 @@ Shader "Ocean/Ocean"
 					#if defined( DEBUG_SHAPE_SAMPLE )
 					col.rgb *= 2.*i.debugtint;
 					#endif
-
-					// check normals
-					//col.rb = norm;
-					//col.g = i.facing.z;
-					//col.rb *= 50.;
 
 					return col;
 				}
