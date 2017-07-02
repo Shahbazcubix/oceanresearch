@@ -5,17 +5,15 @@ using UnityEngine;
 namespace OceanResearch
 {
     /// <summary>
-    /// Positions wave data render camera. Snaps to shape texels to avoid aliasing. May be combined with Circle Offset component to place in front of camera.
+    /// Positions wave data render camera. Snaps to shape texels to avoid aliasing.
     /// </summary>
     [RequireComponent( typeof( Camera ) )]
     public class WaveDataCam : MonoBehaviour
     {
-        public int _wdRes = 0;
-        public bool _biggestLod = false;
-
-        string _waveDataPosParamName;
-        string _waveDataParamsName;
-        string _waveDataPosContParamName;
+        [HideInInspector]
+        public int _lodIndex = 0;
+        [HideInInspector]
+        public int _lodCount = 5;
 
         int _shapeRes = 512;
 
@@ -75,25 +73,25 @@ namespace OceanResearch
         public void ApplyMaterialParams( int shapeSlot, Material mat )
         {
             mat.SetTexture( "_WD_Sampler_" + shapeSlot.ToString(), camera.targetTexture );
-            float shapeWeight = _biggestLod ? OceanRenderer.Instance.ViewerAltitudeLevelAlpha : 1f;
+            float shapeWeight = (_lodIndex == _lodCount - 1) ? OceanRenderer.Instance.ViewerAltitudeLevelAlpha : 1f;
             mat.SetVector( "_WD_Params_" + shapeSlot.ToString(), new Vector3( _renderData._texelWidth, _renderData._textureRes, shapeWeight ) );
             mat.SetVector( "_WD_Pos_" + shapeSlot.ToString(), new Vector2( _renderData._posSnapped.x, _renderData._posSnapped.z ) );
             mat.SetVector( "_WD_Pos_Cont_" + shapeSlot.ToString(), new Vector2( _renderData._posContinuous.x, _renderData._posContinuous.z ) );
-            mat.SetInt( "_WD_LodIdx_" + shapeSlot.ToString(), _wdRes );
+            mat.SetInt( "_WD_LodIdx_" + shapeSlot.ToString(), _lodIndex );
         }
 
         void OnGUI()
         {
             float w = 125f;
 
-            float yoff = 50f * (float)_wdRes;
+            float yoff = 50f * (float)_lodIndex;
 
             // toggle to stop wave data camera moving
             SphereOffset co = GetComponent<SphereOffset>();
             if( co != null )
                 co.enabled = GUI.Toggle( new Rect( 0, 100 + yoff, 15, 25 ), co.enabled, "" );
 
-            GUI.Label( new Rect( 15, 100 + yoff, w, 25 ), _wdRes.ToString() + " shape res: " + _shapeRes );
+            GUI.Label( new Rect( 15, 100 + yoff, w, 25 ), _lodIndex.ToString() + " shape res: " + _shapeRes );
             float res = GUI.HorizontalSlider( new Rect( 0, 125 + yoff, w, 25 ), (int)(Mathf.Log( (float)_shapeRes ) / Mathf.Log( 2f )), 5, 11 );
             res = Mathf.Pow( 2f, Mathf.Floor( res ) );
             _shapeRes = (int)res;

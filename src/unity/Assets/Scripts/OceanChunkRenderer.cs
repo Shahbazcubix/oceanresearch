@@ -38,9 +38,10 @@ namespace OceanResearch
 
             // assign shape textures to shader
             // this relies on the render textures being init'd in CreateAssignRenderTexture::Awake().
-            WaveDataCam wdc0 = OceanRenderer.Instance.Builder._shapeCameras[_lodIndex].GetComponent<WaveDataCam>();
+            Camera[] shapeCams = OceanRenderer.Instance.Builder._shapeCameras;
+            WaveDataCam wdc0 = shapeCams[_lodIndex].GetComponent<WaveDataCam>();
             wdc0.ApplyMaterialParams( 0, _thisRend.material );
-            WaveDataCam wdc1 = (_lodIndex + 1) < OceanRenderer.Instance.Builder._shapeCameras.Length ? OceanRenderer.Instance.Builder._shapeCameras[_lodIndex + 1].GetComponent<WaveDataCam>() : null;
+            WaveDataCam wdc1 = (_lodIndex + 1) < shapeCams.Length ? shapeCams[_lodIndex + 1].GetComponent<WaveDataCam>() : null;
             if( wdc1 )
             {
                 wdc1.ApplyMaterialParams( 1, _thisRend.material );

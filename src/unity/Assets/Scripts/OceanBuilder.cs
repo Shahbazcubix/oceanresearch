@@ -12,7 +12,9 @@ namespace OceanResearch
     /// </summary>
     public class OceanBuilder : MonoBehaviour
     {
+        [Tooltip("Prefab for an ocean patch.")]
 	    public Transform _chunkPrefab;
+        [Tooltip("Prefab for a camera that renders ocean shape.")]
         public Transform _shapeCameraPrefab;
 
         [HideInInspector]
@@ -176,8 +178,8 @@ namespace OceanResearch
                 scs[i] = Instantiate( _shapeCameraPrefab ) as Transform;
                 _shapeCameras[i] = scs[i].GetComponent<Camera>();
                 var wdc = _shapeCameras[i].GetComponent<WaveDataCam>();
-                wdc._wdRes = i;
-                wdc._biggestLod = i == (parms._lodCount - 1);
+                wdc._lodIndex = i;
+                wdc._lodCount = parms._lodCount;
                 var cart = _shapeCameras[i].GetComponent<CreateAssignRenderTexture>();
                 cart._targetName = "shapeRT" + i.ToString();
                 cart._width = cart._height = (int)(4f * parms._baseVertDensity);
