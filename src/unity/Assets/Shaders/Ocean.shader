@@ -76,9 +76,10 @@ Shader "Ocean/Ocean"
 				// INSTANCE PARAMS
 
 				// Geometry data
-				// xyz: A square is formed by 2 triangles in the mesh. Here xyz is (square size, 2 X square size, next square size)
+				// x: A square is formed by 2 triangles in the mesh. Here x is square size
+				// yz: normalScrollSpeed0, normalScrollSpeed1
 				// w: Geometry density - side length of patch measured in squares
-				uniform float4 _GeomData = float4(1.0, 2.0, 4.0, 32.0);
+				uniform float4 _GeomData = float4(1.0, 1.0, 1.0, 32.0);
 
 				// MeshScaleLerp, FarNormalsWeight, LODIndex (debug), unused
 				uniform float4 _InstanceData = float4(1.0, 1.0, 0.0, 0.0 );
@@ -149,7 +150,7 @@ Shader "Ocean/Ocean"
 					v2f o;
 
 					// see comments above on _GeomData
-					const float SQUARE_SIZE = _GeomData.x, SQUARE_SIZE_2 = _GeomData.y, SQUARE_SIZE_4 = _GeomData.z;
+					const float SQUARE_SIZE = _GeomData.x, SQUARE_SIZE_4 = 4.0*_GeomData.x;
 					const float DENSITY = _GeomData.w;
 
 					// move to world
@@ -157,7 +158,7 @@ Shader "Ocean/Ocean"
 	
 					// snap the verts to the grid
 					// The snap size should be twice the original size to keep the shape of the eight triangles (otherwise the edge layout changes).
-					o.worldPos.xz -= fmod( _OceanCenterPosWorld.xz, SQUARE_SIZE_2 ); // this uses hlsl fmod, not glsl mod (sign is different).
+					o.worldPos.xz -= fmod( _OceanCenterPosWorld.xz, 2.0*SQUARE_SIZE ); // this uses hlsl fmod, not glsl mod (sign is different).
 	
 					// how far are we into the current LOD? compute by comparing the desired square size with the actual square size
 					float2 offsetFromCenter = float2( abs( o.worldPos.x - _OceanCenterPosWorld.x ), abs( o.worldPos.z - _OceanCenterPosWorld.z ) );
@@ -231,22 +232,22 @@ Shader "Ocean/Ocean"
 				half4 frag(v2f i) : SV_Target
 				{
 					// normal - geom + normal mapping
-					float2 v0 = float2(0.94,0.34), v1 = float2(-0.85,-0.53);
-					float geomSquareSize = _GeomData.x;
+					const float2 v0 = float2(0.94,0.34), v1 = float2(-0.85,-0.53);
+					const float geomSquareSize = _GeomData.x;
 					float nstretch = 80.*geomSquareSize; // normals scaled with geometry
-					float spdmulL = log( 1. + 2.*geomSquareSize ) * 1.875;
+					const float spdmulL = _GeomData.y;
 					float2 norm = 
 						tex2D( _Normals, (v0*_MyTime*spdmulL + i.worldPos.xz) / nstretch ).wz +
 						tex2D( _Normals, (v1*_MyTime*spdmulL + i.worldPos.xz) / nstretch ).wz;
 
 					// blend in next higher scale of normals to obtain continuity
 					const float farNormalsWeight = _InstanceData.y;
-					float nblend = i.foamAmount_lodAlpha.y * farNormalsWeight;
+					const float nblend = i.foamAmount_lodAlpha.y * farNormalsWeight;
 					if( nblend > 0.001 )
 					{
 						// next lod level
 						nstretch *= 2.;
-						float spdmulH = log( 1. + 4.*geomSquareSize ) * 1.875;
+						const float spdmulH = _GeomData.z;
 						norm = lerp( norm,
 							tex2D( _Normals, (v0*_MyTime*spdmulH + i.worldPos.xz) / nstretch ).wz +
 							tex2D( _Normals, (v1*_MyTime*spdmulH + i.worldPos.xz) / nstretch ).wz,

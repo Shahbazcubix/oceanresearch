@@ -32,7 +32,9 @@ namespace OceanResearch
 
             // geometry data
             float squareSize = Mathf.Abs( transform.lossyScale.x ) / _baseVertDensity;
-            _thisRend.material.SetVector( "_GeomData", new Vector4( squareSize, squareSize * 2f, squareSize * 4f, _baseVertDensity ) );
+            float normalScrollSpeed0 = Mathf.Log( 1f + 2f * squareSize ) * 1.875f;
+            float normalScrollSpeed1 = Mathf.Log( 1f + 4f * squareSize ) * 1.875f;
+            _thisRend.material.SetVector( "_GeomData", new Vector4( squareSize, normalScrollSpeed0, normalScrollSpeed1, _baseVertDensity ) );
         }
 
         public void SetInstanceData( int lodIndex, int totalLodCount, float baseVertDensity )
