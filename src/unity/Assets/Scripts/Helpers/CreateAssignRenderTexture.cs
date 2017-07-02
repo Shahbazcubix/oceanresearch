@@ -9,6 +9,7 @@ using UnityEngine;
 [RequireComponent(typeof(Camera))]
 public class CreateAssignRenderTexture : MonoBehaviour
 {
+    public string _targetName = "anon_ocean_rt";
     public int _width = 32;
     public int _height = 32;
     public int _depthBits = 0;
@@ -22,6 +23,7 @@ public class CreateAssignRenderTexture : MonoBehaviour
 	void Start()
     {
         RenderTexture tex = new RenderTexture( _width, _height, _depthBits, _format );
+        tex.name = _targetName;
         tex.wrapMode = _wrapMode;
         tex.antiAliasing = _antiAliasing;
         tex.filterMode = _filterMode;

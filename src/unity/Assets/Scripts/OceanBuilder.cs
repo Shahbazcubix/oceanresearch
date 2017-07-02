@@ -179,6 +179,7 @@ namespace OceanResearch
                 wdc._wdRes = i;
                 wdc._biggestLod = i == (parms._lodCount - 1);
                 var cart = _shapeCameras[i].GetComponent<CreateAssignRenderTexture>();
+                cart._targetName = "shapeRT" + i.ToString();
                 cart._width = cart._height = (int)(4f * parms._baseVertDensity);
             }
 

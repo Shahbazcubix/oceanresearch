@@ -102,6 +102,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f40c459dd71575949bd9de2fee07644a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _targetName: anon_ocean_rt
   _width: 256
   _height: 256
   _depthBits: 0
