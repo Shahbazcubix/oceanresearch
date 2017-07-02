@@ -38,14 +38,8 @@ namespace OceanResearch
         // Shader to be used to render out a single Gerstner octave.
         public Shader GerstnerOctaveShader;
 
-        float _elapsedTime = 0f;
-
-        Renderer[] _rends;
-
         void Start()
         {
-            _rends = new Renderer[NumOctaves];
-
             // Generate the given number of octaves, each generating a GameObject rendering a quad.
             for (int i = 0; i < NumOctaves; i++)
             {
@@ -90,21 +84,6 @@ namespace OceanResearch
 
                 // Choppiness
                 renderer.material.SetFloat("_Steepness", Choppiness);
-
-                _rends[i] = renderer;
-            }
-        }
-
-        void LateUpdate()
-        {
-            if( !OceanRenderer.Instance._freezeTime )
-            {
-                _elapsedTime += Time.deltaTime;
-            }
-
-            foreach (Renderer rend in _rends)
-            {
-                rend.material.SetFloat("_MyTime", _elapsedTime);
             }
         }
     }

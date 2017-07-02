@@ -23,6 +23,7 @@ namespace OceanResearch
         public bool _enableSmoothLOD = true;
         [Tooltip( "Freeze wave shape in place but continues to move geom with camera, useful for hunting down pops" )]
         public bool _freezeTime = false;
+        float _elapsedTime = 0f;
 
         [Header( "Geometry Params" )]
         [SerializeField]
@@ -61,8 +62,14 @@ namespace OceanResearch
 
         void LateUpdate()
         {
+            if( !_freezeTime )
+            {
+                _elapsedTime += Time.deltaTime;
+            }
+
             // set global shader params
             Shader.SetGlobalVector( "_OceanCenterPosWorld", transform.position );
+            Shader.SetGlobalFloat( "_MyTime", _elapsedTime );
 
             // assign shape textures to shader
             // this relies on the render textures being init'd in CreateAssignRenderTexture::Awake().
