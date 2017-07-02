@@ -272,21 +272,23 @@ Shader "Ocean/Ocean"
 					float3 skyColor = texCUBE(_Skybox, reflect(-view, n) );
 					col.xyz = lerp( col.xyz, skyColor, pow( 1. - max( 0., dot( view, n ) ), 8. ) );
 
-					// foam
+					// Foam
 					float foamAmount = i.foamAmount_lodAlpha.x;
 
 					// Give the foam some texture
 					float2 foamUV = i.worldXZUndisplaced / 80.;
 					foamUV += 0.02 * n.xz;
-					foamAmount *= tex2D( _FoamTexture, foamUV ).r;
+					float foamTexValue = tex2D(_FoamTexture, foamUV).r;
 
-					// Use different thresholds for underwater bubbles (additive) and white foam (on top)
-					float whiteFoam = smoothstep(0.2, 0.7, foamAmount);
-					float bubbleFoam = smoothstep(0.0, 0.5, foamAmount);
-
+					// Additive underwater foam
+					float bubbleFoam = smoothstep(0.0, 0.5, foamAmount * foamTexValue);
 					col.xyz += bubbleFoam * _FoamBubbleColor.rgb * _FoamBubbleColor.a;
+					
+					// White foam on top, with black-point fading
+					float whiteFoam = foamTexValue * smoothstep(1.0 - foamAmount, 1.3 - foamAmount, foamTexValue);
 					col.xyz = lerp( col.xyz, _FoamWhiteColor, whiteFoam * _FoamWhiteColor.a );
-	
+
+					// Fog
 					UNITY_APPLY_FOG(i.fogCoord, col);
 	
 					//const float lodIndex = _InstanceData.z;
